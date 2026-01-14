@@ -9,6 +9,38 @@ const getGeminiClient = () => {
   return new GoogleGenAI({ apiKey });
 };
 
+export const detectAccessoryType = async (imageBase64: string): Promise<AccessoryType> => {
+  const ai = getGeminiClient();
+  const cleanBase64 = imageBase64.replace(/^data:image\/(png|jpeg|jpg|webp);base64,/, "");
+
+  const prompt = "Analyze this image and classify the main jewelry/accessory item. Is it a WATCH, BRACELET, or RING? Return ONLY one of these words. If it is unclear, default to WATCH.";
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: {
+        parts: [
+          { text: prompt },
+          {
+            inlineData: {
+              mimeType: 'image/jpeg',
+              data: cleanBase64
+            }
+          }
+        ]
+      }
+    });
+
+    const text = response.text?.toUpperCase() || '';
+    if (text.includes('RING')) return 'RING';
+    if (text.includes('BRACELET')) return 'BRACELET';
+    return 'WATCH';
+  } catch (error) {
+    console.warn("Auto-detection failed, defaulting to WATCH", error);
+    return 'WATCH';
+  }
+};
+
 export const generateTryOnImage = async (
   baseImageBase64: string,
   accessoryImageBase64: string,

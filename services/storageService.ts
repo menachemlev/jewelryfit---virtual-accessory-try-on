@@ -1,10 +1,11 @@
-import { HistoryItem, RateLimitState, User } from '../types';
+import { HistoryItem, RateLimitState, User, Language } from '../types';
 
 const KEYS = {
   USER: 'chronofit_user',
   HISTORY: 'chronofit_history',
   USAGE: 'chronofit_usage',
-  THEME: 'chronofit_theme'
+  THEME: 'chronofit_theme',
+  LANG: 'chronofit_lang'
 };
 
 const LIMITS = {
@@ -15,6 +16,15 @@ const LIMITS = {
 };
 
 export const storageService = {
+  // Language
+  getLanguage: (): Language => {
+    return (localStorage.getItem(KEYS.LANG) as Language) || 'en';
+  },
+
+  setLanguage: (lang: Language) => {
+    localStorage.setItem(KEYS.LANG, lang);
+  },
+
   // Theme
   getTheme: (): 'light' | 'dark' => {
     return (localStorage.getItem(KEYS.THEME) as 'light' | 'dark') || 'dark';

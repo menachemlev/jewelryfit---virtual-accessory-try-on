@@ -1,14 +1,18 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
+import { Language } from '../types';
+import { translations } from '../constants/translations';
 
 interface ImageEditorProps {
   imageSrc: string;
   onSave: (newBase64: string) => void;
   onCancel: () => void;
+  lang: Language;
 }
 
-export const ImageEditor: React.FC<ImageEditorProps> = ({ imageSrc, onSave, onCancel }) => {
+export const ImageEditor: React.FC<ImageEditorProps> = ({ imageSrc, onSave, onCancel, lang }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [image, setImage] = useState<HTMLImageElement | null>(null);
+  const t = translations[lang];
   
   // Editor State
   const [scale, setScale] = useState(1);
@@ -106,7 +110,7 @@ export const ImageEditor: React.FC<ImageEditorProps> = ({ imageSrc, onSave, onCa
         
         {/* Header */}
         <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-900">
-          <h3 className="text-lg font-bold text-gray-900 dark:text-white">Edit Image</h3>
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white">{t.editImage}</h3>
           <button onClick={onCancel} className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
@@ -114,7 +118,7 @@ export const ImageEditor: React.FC<ImageEditorProps> = ({ imageSrc, onSave, onCa
 
         {/* Canvas Area */}
         <div className="flex-grow bg-[#1a1a1a] flex items-center justify-center p-4 relative overflow-hidden select-none">
-          <p className="absolute top-4 left-0 w-full text-center text-xs text-gray-500 pointer-events-none z-10">Drag image to position • Use slider to Zoom/Crop</p>
+          <p className="absolute top-4 left-0 w-full text-center text-xs text-gray-500 pointer-events-none z-10">{t.dragText}</p>
           <canvas
             ref={canvasRef}
             width={400}
@@ -134,7 +138,7 @@ export const ImageEditor: React.FC<ImageEditorProps> = ({ imageSrc, onSave, onCa
           {/* Zoom & Rotate */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
-              <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Zoom / Crop</label>
+              <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">{t.zoomCrop}</label>
               <input
                 type="range"
                 min="0.1"
@@ -147,7 +151,7 @@ export const ImageEditor: React.FC<ImageEditorProps> = ({ imageSrc, onSave, onCa
             </div>
 
             <div className="space-y-2">
-              <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Rotation</label>
+              <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">{t.rotation}</label>
               <div className="flex gap-2">
                 <button onClick={rotateLeft} className="flex-1 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg text-gray-700 dark:text-gray-200 text-sm font-medium transition-colors">
                   ↺ -90°
@@ -163,7 +167,7 @@ export const ImageEditor: React.FC<ImageEditorProps> = ({ imageSrc, onSave, onCa
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
              <div className="space-y-2">
               <div className="flex justify-between">
-                <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Brightness</label>
+                <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">{t.brightness}</label>
                 <span className="text-xs text-gray-400">{brightness}%</span>
               </div>
               <input
@@ -178,7 +182,7 @@ export const ImageEditor: React.FC<ImageEditorProps> = ({ imageSrc, onSave, onCa
 
             <div className="space-y-2">
               <div className="flex justify-between">
-                <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Contrast</label>
+                <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">{t.contrast}</label>
                 <span className="text-xs text-gray-400">{contrast}%</span>
               </div>
               <input
@@ -195,10 +199,10 @@ export const ImageEditor: React.FC<ImageEditorProps> = ({ imageSrc, onSave, onCa
           {/* Actions */}
           <div className="pt-4 flex gap-4">
              <button onClick={onCancel} className="flex-1 py-3 rounded-xl border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-bold hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                Cancel
+                {t.cancel}
              </button>
              <button onClick={handleSave} className="flex-1 py-3 rounded-xl bg-yellow-500 text-black font-bold shadow-lg shadow-yellow-500/20 hover:bg-yellow-400 transition-colors">
-                Apply Changes
+                {t.apply}
              </button>
           </div>
 

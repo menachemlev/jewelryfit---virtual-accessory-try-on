@@ -33,3 +33,5 @@ export interface RateLimitState {
   dailyCount: number;
   lastDailyReset: string;
 }
+
+export type Language = 'en' | 'he';

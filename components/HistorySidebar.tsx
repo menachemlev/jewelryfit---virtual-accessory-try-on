@@ -1,14 +1,18 @@
 import React from 'react';
-import { HistoryItem } from '../types';
+import { HistoryItem, Language } from '../types';
+import { translations } from '../constants/translations';
 
 interface HistorySidebarProps {
   isOpen: boolean;
   onClose: () => void;
   items: HistoryItem[];
   onSelect: (item: HistoryItem) => void;
+  lang: Language;
 }
 
-export const HistorySidebar: React.FC<HistorySidebarProps> = ({ isOpen, onClose, items, onSelect }) => {
+export const HistorySidebar: React.FC<HistorySidebarProps> = ({ isOpen, onClose, items, onSelect, lang }) => {
+  const t = translations[lang];
+
   return (
     <>
       {/* Backdrop */}
@@ -19,11 +23,11 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = ({ isOpen, onClose,
         />
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar - Adjust translate direction for RTL if needed, currently assumes standard right sidebar */}
       <div className={`fixed top-0 right-0 h-full w-80 bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 shadow-2xl z-50 transform transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}>
         <div className="p-6 h-full flex flex-col">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-xl font-bold text-gray-900 dark:text-white">Your History</h3>
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white">{t.historyTitle}</h3>
             <button 
               onClick={onClose}
               className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white transition-colors"
@@ -37,8 +41,8 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = ({ isOpen, onClose,
           <div className="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar">
             {items.length === 0 ? (
               <div className="text-center text-gray-500 mt-10">
-                <p>No try-ons yet.</p>
-                <p className="text-sm mt-2">Generate some images!</p>
+                <p>{t.noHistory}</p>
+                <p className="text-sm mt-2">{t.generateSome}</p>
               </div>
             ) : (
               items.map((item) => (
@@ -53,7 +57,7 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = ({ isOpen, onClose,
                   </div>
                   <div className="p-3">
                     <div className="flex justify-between items-center text-xs text-gray-500 dark:text-gray-400">
-                      <span className="font-semibold text-gray-700 dark:text-gray-300">{item.accessoryType}</span>
+                      <span className="font-semibold text-gray-700 dark:text-gray-300">{t.types[item.accessoryType]}</span>
                       <span>{new Date(item.timestamp).toLocaleDateString()}</span>
                     </div>
                   </div>
@@ -63,7 +67,7 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = ({ isOpen, onClose,
           </div>
           
           <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-800 text-center">
-            <p className="text-xs text-gray-500 dark:text-gray-600">History stored locally (Max 5)</p>
+            <p className="text-xs text-gray-500 dark:text-gray-600">{t.localHistory}</p>
           </div>
         </div>
       </div>
