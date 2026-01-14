@@ -65,16 +65,16 @@ export const translations = {
     },
      tutorialContent: {
         RING: {
+          goodTitle: "Good: Hand Flat",
+          badTitle: "Bad: Clenched Fist",
           good: "Place hand flat on a neutral surface or hold it up naturally. Ensure fingers are spread slightly. Good, even lighting.",
           bad: "Clenched fist, blurry motion, dark shadows, or fingers hidden by sleeves/objects.",
-          goodImg: "https://placehold.co/600x400/ecfdf5/047857?text=Good:+Hand+Flat",
-          badImg: "https://placehold.co/600x400/fef2f2/b91c1c?text=Bad:+Clenched+Fist"
         },
         WATCH: { 
+          goodTitle: "Good: Clear Wrist",
+          badTitle: "Bad: Sleeve Covering",
           good: "Extend arm with wrist clearly visible. Roll up sleeves. Keep the wrist straight or slightly relaxed. Top-down view.",
           bad: "Sleeve covering wrist, extreme angles where the wrist bone is hidden, or arm too far away.",
-          goodImg: "https://placehold.co/600x400/ecfdf5/047857?text=Good:+Clear+Wrist",
-          badImg: "https://placehold.co/600x400/fef2f2/b91c1c?text=Bad:+Sleeve+Covering"
         }
       }
   },
@@ -142,16 +142,16 @@ export const translations = {
     },
     tutorialContent: {
         RING: {
+          goodTitle: "טוב: יד פרוסה",
+          badTitle: "לא טוב: אגרוף קמוץ",
           good: "הניחו את היד שטוחה או החזיקו אותה בטבעיות. ודאו שהאצבעות פרוסות מעט. תאורה טובה ואחידה.",
           bad: "אגרוף קמוץ, תנועה מטושטשת, צללים כהים, או אצבעות מוסתרות.",
-          goodImg: "https://placehold.co/600x400/ecfdf5/047857?text=%D7%98%D7%95%D7%91:+%D7%99%D7%93+%D7%A4%D7%A8%D7%95%D7%A1%D7%94",
-          badImg: "https://placehold.co/600x400/fef2f2/b91c1c?text=%D7%9C%D7%90+%D7%98%D7%95%D7%91:+%D7%90%D7%92%D7%A8%D7%95%D7%A3"
         },
         WATCH: {
+          goodTitle: "טוב: פרק יד גלוי",
+          badTitle: "לא טוב: שרוול מכסה",
           good: "הושיטו את הזרוע כשפרק כף היד גלוי. הפשילו שרוולים. שמרו על היד ישרה. מבט מלמעלה.",
           bad: "שרוול המכסה את היד, זוויות קיצוניות, או צילום מרחוק מדי.",
-          goodImg: "https://placehold.co/600x400/ecfdf5/047857?text=%D7%98%D7%95%D7%91:+%D7%A4%D7%A8%D7%A7+%D7%99%D7%93+%D7%92%D7%9C%D7%95%D7%99",
-          badImg: "https://placehold.co/600x400/fef2f2/b91c1c?text=%D7%9C%D7%90+%D7%98%D7%95%D7%91:+%D7%A9%D7%A8%D7%95%D7%95%D7%9C+%D7%9E%D7%9B%D7%A1%D7%94"
         }
       }
   }
