@@ -2,6 +2,11 @@ import React, { useCallback } from 'react';
 import { ImageState, Language } from '../types';
 import { translations } from '../constants/translations';
 
+export interface ValidationState {
+  status: 'idle' | 'analyzing' | 'valid' | 'invalid';
+  message?: string;
+}
+
 interface ImageUploaderProps {
   label: string;
   imageState: ImageState;
@@ -9,9 +14,10 @@ interface ImageUploaderProps {
   onEdit?: () => void;
   id: string;
   lang: Language;
+  validation?: ValidationState;
 }
 
-export const ImageUploader: React.FC<ImageUploaderProps> = ({ label, imageState, onImageChange, onEdit, id, lang }) => {
+export const ImageUploader: React.FC<ImageUploaderProps> = ({ label, imageState, onImageChange, onEdit, id, lang, validation }) => {
   const t = translations[lang];
   
   const handleFileChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
@@ -33,16 +39,50 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({ label, imageState,
     onImageChange({ file: null, previewUrl: null, base64: null });
   }, [onImageChange]);
 
+  // Determine border and status styles
+  let borderClass = "border-gray-300 dark:border-gray-700 hover:border-yellow-500/50";
+  let statusIcon = null;
+  
+  if (validation) {
+    if (validation.status === 'valid') {
+      borderClass = "border-green-500 ring-2 ring-green-500/20";
+      statusIcon = (
+        <div className="absolute top-2 right-2 bg-green-500 text-white p-1 rounded-full shadow-md z-10 flex items-center gap-1 px-2">
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>
+          {validation.message && <span className="text-[10px] font-bold">{validation.message}</span>}
+        </div>
+      );
+    } else if (validation.status === 'invalid') {
+      borderClass = "border-red-500 ring-2 ring-red-500/20";
+      statusIcon = (
+        <div className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full shadow-md z-10 flex items-center gap-1 px-2">
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12" /></svg>
+          {validation.message && <span className="text-[10px] font-bold">{validation.message}</span>}
+        </div>
+      );
+    } else if (validation.status === 'analyzing') {
+       borderClass = "border-blue-400 animate-pulse";
+       statusIcon = (
+        <div className="absolute top-2 right-2 bg-blue-500 text-white p-1 rounded-full shadow-md z-10 flex items-center gap-1 px-2">
+          <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+          <span className="text-[10px] font-bold">{t.analyzing}</span>
+        </div>
+      );
+    }
+  }
+
   return (
     <div className="flex flex-col gap-2 w-full">
-      <label className="text-sm font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider">{label}</label>
+      <label className="text-sm font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider flex justify-between">
+        {label}
+      </label>
       
       {!imageState.previewUrl ? (
         <label 
           htmlFor={id} 
-          className="flex flex-col items-center justify-center w-full h-64 border-2 border-dashed rounded-xl cursor-pointer transition-all duration-300 group 
-            bg-gray-50 border-gray-300 hover:bg-gray-100 hover:border-yellow-500/50 
-            dark:bg-gray-800 dark:border-gray-700 dark:hover:bg-gray-750"
+          className={`flex flex-col items-center justify-center w-full h-64 border-2 border-dashed rounded-xl cursor-pointer transition-all duration-300 group 
+            bg-gray-50 hover:bg-gray-100 
+            dark:bg-gray-800 dark:hover:bg-gray-750 ${borderClass}`}
         >
           <div className="flex flex-col items-center justify-center pt-5 pb-6">
             <svg className="w-10 h-10 mb-3 text-gray-400 group-hover:text-yellow-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -62,7 +102,8 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({ label, imageState,
           />
         </label>
       ) : (
-        <div className="relative w-full h-64 rounded-xl overflow-hidden border border-gray-300 dark:border-gray-700 group bg-gray-50 dark:bg-gray-800">
+        <div className={`relative w-full h-64 rounded-xl overflow-hidden border-2 group bg-gray-50 dark:bg-gray-800 transition-colors ${borderClass}`}>
+          {statusIcon}
           <img 
             src={imageState.previewUrl} 
             alt="Preview" 

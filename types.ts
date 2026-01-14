@@ -26,6 +26,7 @@ export interface HistoryItem {
   timestamp: number;
   accessoryType: AccessoryType;
   resultImage: string;
+  accessoryImage: string; // Added to support comparison
 }
 
 export interface RateLimitState {

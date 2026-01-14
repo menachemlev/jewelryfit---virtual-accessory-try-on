@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { ImageUploader } from './components/ImageUploader';
+import { ImageUploader, ValidationState } from './components/ImageUploader';
 import { LoginScreen } from './components/LoginScreen';
 import { HistorySidebar } from './components/HistorySidebar';
 import { ImageEditor } from './components/ImageEditor';
 import { TutorialModal } from './components/TutorialModal';
 import { Logo } from './components/Logo';
-import { generateTryOnImage, detectAccessoryType } from './services/geminiService';
+import { generateTryOnImage, detectAccessoryType, validateImageSuitability } from './services/geminiService';
 import { storageService } from './services/storageService';
 import { ImageState, ProcessingStatus, AccessoryType, User, HistoryItem, Language } from './types';
 import { translations } from './constants/translations';
@@ -31,7 +31,11 @@ const App: React.FC = () => {
   const [accessoryType, setAccessoryType] = useState<AccessoryType>('WATCH');
   const [isDetectingType, setIsDetectingType] = useState(false);
   const [hasKey, setHasKey] = useState<boolean>(false);
+  const [showComparison, setShowComparison] = useState(false);
   
+  // Validation State
+  const [baseImageValidation, setBaseImageValidation] = useState<ValidationState>({ status: 'idle' });
+
   // History State
   const [showHistory, setShowHistory] = useState(false);
   const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
@@ -131,13 +135,33 @@ const App: React.FC = () => {
   const handleEditorSave = async (newBase64: string) => {
     if (editingTarget === 'base') {
       setBaseImage(prev => ({ ...prev, previewUrl: newBase64, base64: newBase64 }));
+      // Re-validate on edit
+      setBaseImageValidation({ status: 'analyzing' });
+      const analysis = await validateImageSuitability(newBase64, accessoryType, lang);
+      setBaseImageValidation({
+        status: analysis.suitable ? 'valid' : 'invalid',
+        message: analysis.message
+      });
     } else if (editingTarget === 'accessory') {
       setAccessoryImage(prev => ({ ...prev, previewUrl: newBase64, base64: newBase64 }));
       // Re-detect on edit save
       setIsDetectingType(true);
       try {
         const type = await detectAccessoryType(newBase64);
-        setAccessoryType(type);
+        
+        // Only if detection changed the type do we update and re-validate
+        if (type !== accessoryType) {
+            setAccessoryType(type);
+            // Trigger re-validation of base image against new type
+            if (baseImage.base64) {
+                setBaseImageValidation({ status: 'analyzing' });
+                const analysis = await validateImageSuitability(baseImage.base64, type, lang);
+                setBaseImageValidation({
+                    status: analysis.suitable ? 'valid' : 'invalid',
+                    message: analysis.message
+                });
+            }
+        }
       } catch (e) {
         console.error("Auto-detect failed", e);
       } finally {
@@ -153,13 +177,46 @@ const App: React.FC = () => {
     setEditingTarget(null);
   };
 
+  const handleBaseImageUpload = async (state: ImageState) => {
+    setBaseImage(state);
+    if (state.base64) {
+      setBaseImageValidation({ status: 'analyzing' });
+      try {
+        const analysis = await validateImageSuitability(state.base64, accessoryType, lang);
+        setBaseImageValidation({
+          status: analysis.suitable ? 'valid' : 'invalid',
+          message: analysis.message
+        });
+      } catch (e) {
+        console.error("Validation failed", e);
+        setBaseImageValidation({ status: 'idle' });
+      }
+    } else {
+      setBaseImageValidation({ status: 'idle' });
+    }
+  };
+
   const handleAccessoryUpload = async (state: ImageState) => {
     setAccessoryImage(state);
     if (state.base64) {
       setIsDetectingType(true);
       try {
         const type = await detectAccessoryType(state.base64);
-        setAccessoryType(type);
+        
+        // Only update and revalidate if type changed
+        if (type !== accessoryType) {
+            setAccessoryType(type);
+            
+            // If we have a base image, re-validate it against the new type
+            if (baseImage.base64) {
+                setBaseImageValidation({ status: 'analyzing' });
+                const analysis = await validateImageSuitability(baseImage.base64, type, lang);
+                setBaseImageValidation({
+                    status: analysis.suitable ? 'valid' : 'invalid',
+                    message: analysis.message
+                });
+            }
+        }
       } catch (e) {
         console.error("Auto-detect failed", e);
       } finally {
@@ -209,6 +266,7 @@ const App: React.FC = () => {
     setStatus(ProcessingStatus.PROCESSING);
     setErrorMsg(null);
     setResultImage(null);
+    setShowComparison(false);
 
     try {
       const generatedImageBase64 = await generateTryOnImage(baseImage.base64, accessoryImage.base64, accessoryType);
@@ -224,7 +282,8 @@ const App: React.FC = () => {
         id: crypto.randomUUID(),
         timestamp: Date.now(),
         accessoryType,
-        resultImage: generatedImageBase64
+        resultImage: generatedImageBase64,
+        accessoryImage: accessoryImage.base64 // Save accessory for comparison
       };
       
       storageService.saveHistoryItem(newHistoryItem);
@@ -234,7 +293,15 @@ const App: React.FC = () => {
       setStatus(ProcessingStatus.ERROR);
       const msg = e.message || "An unexpected error occurred.";
       
-      if (msg.includes("403") || msg.includes("PERMISSION_DENIED") || msg.includes("permission")) {
+      // Improved error detection logic
+      const isRateLimit = 
+        e.status === 429 || 
+        e.code === 429 || 
+        (e.message && (e.message.includes('429') || e.message.includes('Quota') || e.message.includes('RESOURCE_EXHAUSTED')));
+
+      if (isRateLimit) {
+        setErrorMsg("Server is experiencing high traffic. Please wait a minute and try again.");
+      } else if (msg.includes("403") || msg.includes("PERMISSION_DENIED") || msg.includes("permission")) {
         setHasKey(false);
         setErrorMsg(t.apiKeyError);
       } else {
@@ -246,23 +313,52 @@ const App: React.FC = () => {
   const handleHistorySelect = (item: HistoryItem) => {
     setResultImage(item.resultImage);
     setAccessoryType(item.accessoryType);
+    
+    // Restore Accessory Image State if available in history item (best effort)
+    if (item.accessoryImage) {
+        setAccessoryImage({
+            file: null,
+            previewUrl: item.accessoryImage,
+            base64: item.accessoryImage
+        });
+    }
+
     setShowHistory(false);
+    // Note: We don't restore base image as it might not be saved to save space
     setBaseImage({ file: null, previewUrl: null, base64: null });
-    setAccessoryImage({ file: null, previewUrl: null, base64: null });
+    setBaseImageValidation({ status: 'idle' });
     setStatus(ProcessingStatus.SUCCESS);
   };
 
   const handleReset = () => {
     setBaseImage({ file: null, previewUrl: null, base64: null });
+    setBaseImageValidation({ status: 'idle' });
     setAccessoryImage({ file: null, previewUrl: null, base64: null });
     setResultImage(null);
     setStatus(ProcessingStatus.IDLE);
     setErrorMsg(null);
+    setShowComparison(false);
   };
 
-  const handleTypeChange = (type: AccessoryType) => {
+  const handleTypeChange = async (type: AccessoryType) => {
+    if (type === accessoryType) return;
+    
     setAccessoryType(type);
     setErrorMsg(null);
+    
+    // Re-validate base image if it exists when type changes
+    if (baseImage.base64) {
+        setBaseImageValidation({ status: 'analyzing' });
+        try {
+            const analysis = await validateImageSuitability(baseImage.base64, type, lang);
+            setBaseImageValidation({
+                status: analysis.suitable ? 'valid' : 'invalid',
+                message: analysis.message
+            });
+        } catch(e) {
+             setBaseImageValidation({ status: 'idle' });
+        }
+    }
   };
 
   const getBaseLabel = () => {
@@ -442,9 +538,10 @@ const App: React.FC = () => {
                   id="base-upload"
                   label={getBaseLabel()} 
                   imageState={baseImage} 
-                  onImageChange={setBaseImage}
+                  onImageChange={handleBaseImageUpload}
                   onEdit={() => openEditor('base')}
                   lang={lang}
+                  validation={baseImageValidation}
                 />
               </div>
               
@@ -466,9 +563,9 @@ const App: React.FC = () => {
 
             <button
               onClick={handleGenerate}
-              disabled={status === ProcessingStatus.PROCESSING || !baseImage.base64 || !accessoryImage.base64 || isDetectingType}
+              disabled={status === ProcessingStatus.PROCESSING || !baseImage.base64 || !accessoryImage.base64 || isDetectingType || baseImageValidation.status === 'analyzing'}
               className={`mt-8 w-full py-4 rounded-xl font-bold text-lg tracking-wide shadow-lg transition-all duration-300
-                ${status === ProcessingStatus.PROCESSING || isDetectingType
+                ${status === ProcessingStatus.PROCESSING || isDetectingType || baseImageValidation.status === 'analyzing'
                   ? 'bg-gray-300 dark:bg-gray-700 cursor-not-allowed text-gray-500 dark:text-gray-400' 
                   : 'bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-400 hover:to-yellow-500 text-black hover:shadow-yellow-500/20 transform hover:-translate-y-0.5 active:translate-y-0'
                 }`}
@@ -485,6 +582,10 @@ const App: React.FC = () => {
                 <span className="flex items-center justify-center gap-2">
                    {t.detecting}
                 </span>
+              ) : baseImageValidation.status === 'analyzing' ? (
+                <span className="flex items-center justify-center gap-2">
+                   {t.analyzing}
+                </span>
               ) : (
                 `${t.generate} ${t.types[accessoryType]}`
               )}
@@ -493,40 +594,69 @@ const App: React.FC = () => {
 
           {/* Result Section */}
           <section className="bg-white/80 dark:bg-gray-800/50 backdrop-blur-sm rounded-2xl p-6 border border-gray-200 dark:border-gray-700 shadow-xl min-h-[500px] flex flex-col transition-colors duration-300">
-            <h2 className="text-xl font-semibold mb-6 flex items-center gap-2 text-gray-900 dark:text-white">
-              <span className="bg-yellow-500 text-black w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold">2</span>
-              {t.result}
-            </h2>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-semibold flex items-center gap-2 text-gray-900 dark:text-white">
+                <span className="bg-yellow-500 text-black w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold">2</span>
+                {t.result}
+              </h2>
+              {resultImage && accessoryImage.previewUrl && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-gray-500 dark:text-gray-400">{t.compareOriginal}</span>
+                  <button
+                    onClick={() => setShowComparison(!showComparison)}
+                    className={`w-12 h-6 rounded-full p-1 transition-colors duration-200 ease-in-out ${showComparison ? 'bg-yellow-500' : 'bg-gray-300 dark:bg-gray-600'}`}
+                  >
+                    <div className={`w-4 h-4 bg-white rounded-full shadow-md transform transition-transform duration-200 ease-in-out ${showComparison ? 'translate-x-6 rtl:-translate-x-6' : ''}`} />
+                  </button>
+                </div>
+              )}
+            </div>
 
             <div className="flex-grow flex items-center justify-center bg-gray-100 dark:bg-gray-900/50 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 relative min-h-[400px]">
               {resultImage ? (
-                <div className="relative w-full h-full group flex items-center justify-center">
-                  <img 
-                    src={resultImage} 
-                    alt="Generated Try-On" 
-                    className="max-w-full max-h-[600px] object-contain"
-                  />
-                  {/* Share/Download Buttons - Ensure correct placement for RTL if needed, but flex gap works */}
-                  <div className={`absolute top-4 ${lang === 'he' ? 'left-4' : 'right-4'} flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300`}>
-                    <button 
-                      onClick={handleShare}
-                      className="bg-white/90 dark:bg-black/70 hover:bg-white dark:hover:bg-black text-gray-900 dark:text-white p-2 rounded-lg backdrop-blur-md transition-colors border border-gray-200 dark:border-gray-700"
-                      title={t.share}
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-                      </svg>
-                    </button>
-                    <a 
-                      href={resultImage} 
-                      download="jewelryfit-result.png"
-                      className="bg-white/90 dark:bg-black/70 hover:bg-white dark:hover:bg-black text-gray-900 dark:text-white p-2 rounded-lg backdrop-blur-md transition-colors border border-gray-200 dark:border-gray-700"
-                      title={t.download}
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
-                      </svg>
-                    </a>
+                <div className="w-full h-full flex gap-1">
+                  {/* Comparison Side By Side */}
+                  {showComparison && accessoryImage.previewUrl && (
+                     <div className="flex-1 relative group bg-gray-200 dark:bg-gray-800 border-r border-gray-300 dark:border-gray-700">
+                        <img 
+                          src={accessoryImage.previewUrl} 
+                          alt="Original Accessory" 
+                          className="w-full h-full object-contain"
+                        />
+                         <span className="absolute top-2 left-2 bg-black/50 text-white text-[10px] font-bold px-2 py-1 rounded backdrop-blur-sm">Original</span>
+                     </div>
+                  )}
+
+                  <div className="flex-1 relative group flex items-center justify-center">
+                    <img 
+                      src={resultImage} 
+                      alt="Generated Try-On" 
+                      className="max-w-full max-h-[600px] object-contain"
+                    />
+                    {showComparison && <span className="absolute top-2 left-2 bg-yellow-500/80 text-black text-[10px] font-bold px-2 py-1 rounded backdrop-blur-sm">Result</span>}
+                    
+                    {/* Share/Download Buttons - Ensure correct placement for RTL if needed, but flex gap works */}
+                    <div className={`absolute top-4 ${lang === 'he' ? 'left-4' : 'right-4'} flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300`}>
+                      <button 
+                        onClick={handleShare}
+                        className="bg-white/90 dark:bg-black/70 hover:bg-white dark:hover:bg-black text-gray-900 dark:text-white p-2 rounded-lg backdrop-blur-md transition-colors border border-gray-200 dark:border-gray-700"
+                        title={t.share}
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                        </svg>
+                      </button>
+                      <a 
+                        href={resultImage} 
+                        download="jewelryfit-result.png"
+                        className="bg-white/90 dark:bg-black/70 hover:bg-white dark:hover:bg-black text-gray-900 dark:text-white p-2 rounded-lg backdrop-blur-md transition-colors border border-gray-200 dark:border-gray-700"
+                        title={t.download}
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                        </svg>
+                      </a>
+                    </div>
                   </div>
                 </div>
               ) : (

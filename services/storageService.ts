@@ -1,4 +1,4 @@
-import { HistoryItem, RateLimitState, User, Language } from '../types';
+import { HistoryItem, RateLimitState, User, Language, AccessoryType } from '../types';
 
 const KEYS = {
   USER: 'chronofit_user',
@@ -9,10 +9,10 @@ const KEYS = {
 };
 
 const LIMITS = {
-  SHORT_WINDOW_MS: 5 * 60 * 1000, // 5 minutes
-  SHORT_MAX: 10,
-  DAILY_MAX: 25,
-  MAX_HISTORY_ITEMS: 5 // Limit to prevent localStorage quota exceeded
+  SHORT_WINDOW_MS: 60 * 1000, // 1 minute
+  SHORT_MAX: 8, // conservative limit for 1 minute
+  DAILY_MAX: 50,
+  MAX_ITEMS_PER_CATEGORY: 5
 };
 
 export const storageService = {
@@ -66,13 +66,40 @@ export const storageService = {
   saveHistoryItem: (item: HistoryItem) => {
     try {
       const current = storageService.getHistory();
-      const updated = [item, ...current].slice(0, LIMITS.MAX_HISTORY_ITEMS);
+      
+      // Separate by categories
+      const rings = current.filter(i => i.accessoryType === 'RING');
+      const watches = current.filter(i => i.accessoryType === 'WATCH');
+      const bracelets = current.filter(i => i.accessoryType === 'BRACELET');
+
+      // Add new item to appropriate list
+      if (item.accessoryType === 'RING') {
+        rings.unshift(item);
+      } else if (item.accessoryType === 'WATCH') {
+        watches.unshift(item);
+      } else {
+        bracelets.unshift(item);
+      }
+
+      // Trim lists to limit
+      const trimmedRings = rings.slice(0, LIMITS.MAX_ITEMS_PER_CATEGORY);
+      const trimmedWatches = watches.slice(0, LIMITS.MAX_ITEMS_PER_CATEGORY);
+      const trimmedBracelets = bracelets.slice(0, LIMITS.MAX_ITEMS_PER_CATEGORY);
+
+      // Recombine and sort by timestamp desc
+      const updated = [...trimmedWatches, ...trimmedBracelets, ...trimmedRings].sort((a, b) => b.timestamp - a.timestamp);
+
       localStorage.setItem(KEYS.HISTORY, JSON.stringify(updated));
     } catch (e) {
       console.warn("LocalStorage quota exceeded, could not save history item.");
-      // Try to save just the newest one if full list fails
+      // Fallback: Delete oldest items regardless of category to make space
       try {
-        localStorage.setItem(KEYS.HISTORY, JSON.stringify([item]));
+        const current = storageService.getHistory();
+        if (current.length > 0) {
+            const reduced = current.slice(0, current.length - 2); // Remove last 2
+            reduced.unshift(item);
+            localStorage.setItem(KEYS.HISTORY, JSON.stringify(reduced));
+        }
       } catch (e2) {
         console.error("Critical storage failure");
       }
@@ -103,7 +130,7 @@ export const storageService = {
     }
 
     if (usage.timestamps.length >= LIMITS.SHORT_MAX) {
-      return { allowed: false, message: `Rate limit exceeded (${LIMITS.SHORT_MAX} tries / 5 mins). Please wait a moment.` };
+      return { allowed: false, message: `System busy (${LIMITS.SHORT_MAX} tries / min). Please wait a moment.` };
     }
 
     return { allowed: true };
