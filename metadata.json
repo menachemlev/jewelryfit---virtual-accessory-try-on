@@ -1,0 +1,5 @@
+{
+  "name": "JewelryFit - Virtual Accessory Try-On",
+  "description": "Upload a photo of your hand or wrist and an accessory (Watch, Ring, Bracelet) to see how it looks using generative AI.",
+  "requestFramePermissions": []
+}
