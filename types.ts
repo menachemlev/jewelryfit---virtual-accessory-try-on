@@ -14,6 +14,8 @@ export enum ProcessingStatus {
 
 export type AccessoryType = 'WATCH' | 'BRACELET' | 'RING';
 
+export type FingerType = 'thumb' | 'index' | 'middle' | 'ring' | 'pinky';
+
 export interface User {
   id: string;
   name: string;
@@ -27,6 +29,7 @@ export interface HistoryItem {
   accessoryType: AccessoryType;
   resultImage: string;
   accessoryImage: string; // Added to support comparison
+  selectedFinger?: FingerType; // Optional: finger selected for ring
 }
 
 export interface RateLimitState {

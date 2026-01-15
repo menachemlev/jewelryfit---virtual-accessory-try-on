@@ -8,7 +8,7 @@ import { Logo } from './components/Logo';
 import { generateTryOnImage, detectAccessoryType, validateImageSuitability } from './services/geminiService';
 import { storageService } from './services/storageService';
 import { authService } from './services/authService';
-import { ImageState, ProcessingStatus, AccessoryType, User, HistoryItem, Language } from './types';
+import { ImageState, ProcessingStatus, AccessoryType, User, HistoryItem, Language, FingerType } from './types';
 import { translations } from './constants/translations';
 
 // Declare window interface for AI Studio wrapper
@@ -30,6 +30,7 @@ const App: React.FC = () => {
   const [status, setStatus] = useState<ProcessingStatus>(ProcessingStatus.IDLE);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [accessoryType, setAccessoryType] = useState<AccessoryType>('WATCH');
+  const [selectedFinger, setSelectedFinger] = useState<FingerType>('ring');
   const [isDetectingType, setIsDetectingType] = useState(false);
   const [hasKey, setHasKey] = useState<boolean>(false);
   const [showComparison, setShowComparison] = useState(false);
@@ -302,7 +303,7 @@ const App: React.FC = () => {
     setShowComparison(false);
 
     try {
-      const generatedImageBase64 = await generateTryOnImage(baseImage.base64, accessoryImage.base64, accessoryType);
+      const generatedImageBase64 = await generateTryOnImage(baseImage.base64, accessoryImage.base64, accessoryType, selectedFinger);
       
       // Success
       setResultImage(generatedImageBase64);
@@ -316,7 +317,8 @@ const App: React.FC = () => {
         timestamp: Date.now(),
         accessoryType,
         resultImage: generatedImageBase64,
-        accessoryImage: accessoryImage.base64 // Save accessory for comparison
+        accessoryImage: accessoryImage.base64, // Save accessory for comparison
+        selectedFinger: accessoryType === 'RING' ? selectedFinger : undefined
       };
       
       storageService.saveHistoryItem(newHistoryItem);
@@ -555,6 +557,54 @@ const App: React.FC = () => {
                 ))}
               </div>
             </div>
+
+            {/* Finger Selector - Show only for RING */}
+            {accessoryType === 'RING' && (
+              <div className="mb-8">
+                <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 block">{t.selectFinger}</label>
+                <div className="grid grid-cols-5 gap-2 bg-gray-100 dark:bg-gray-900/50 p-1 rounded-xl border border-gray-200 dark:border-gray-700">
+                  {(['thumb', 'index', 'middle', 'ring', 'pinky'] as FingerType[]).map((finger) => (
+                    <button
+                      key={finger}
+                      onClick={() => setSelectedFinger(finger)}
+                      className={`py-3 px-1 rounded-lg text-xs font-semibold transition-all duration-200 flex flex-col items-center gap-2 ${
+                        selectedFinger === finger 
+                          ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20' 
+                          : 'text-gray-500 dark:text-gray-400 hover:text-black dark:hover:text-white hover:bg-white dark:hover:bg-gray-700'
+                      }`}
+                    >
+                      {/* Finger SVG Icons */}
+                      {finger === 'thumb' && (
+                        <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M7 12c0-2.21 1.79-4 4-4s4 1.79 4 4v6h2V12c0-3.31-2.69-6-6-6S5 8.69 5 12v10h2v-10z"/>
+                        </svg>
+                      )}
+                      {finger === 'index' && (
+                        <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
+                          <rect x="9" y="2" width="3" height="20" rx="1.5"/>
+                        </svg>
+                      )}
+                      {finger === 'middle' && (
+                        <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
+                          <rect x="10.5" y="1" width="3" height="22" rx="1.5"/>
+                        </svg>
+                      )}
+                      {finger === 'ring' && (
+                        <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
+                          <rect x="10" y="4" width="3" height="19" rx="1.5"/>
+                        </svg>
+                      )}
+                      {finger === 'pinky' && (
+                        <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
+                          <rect x="8" y="8" width="2.5" height="15" rx="1.25"/>
+                        </svg>
+                      )}
+                      <span className="text-[10px]">{t.fingers[finger]}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             
             <div className="space-y-6">
               <div className="relative">

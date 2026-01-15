@@ -62,6 +62,14 @@ export const translations = {
     photoUnsuitable: "Photo issue detected",
     item: "Item",
     tryOn: "Try-On",
+    selectFinger: "Select Finger",
+    fingers: {
+      thumb: "Thumb",
+      index: "Index",
+      middle: "Middle",
+      ring: "Ring",
+      pinky: "Pinky"
+    },
     types: {
       WATCH: "Watch",
       BRACELET: "Bracelet",
@@ -150,6 +158,14 @@ export const translations = {
     photoUnsuitable: "זוהתה בעיה בתמונה",
     item: "פריט",
     tryOn: "מדידה",
+    selectFinger: "בחר אצבע",
+    fingers: {
+      thumb: "אגודל",
+      index: "אצבע מורה",
+      middle: "אצבע אמצעית",
+      ring: "אצבע טבעת",
+      pinky: "אצבע קטנה"
+    },
     types: {
       WATCH: "שעון",
       BRACELET: "צמיד",
