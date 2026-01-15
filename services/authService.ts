@@ -32,6 +32,10 @@ let auth: Auth | null = null;
 const initializeFirebase = () => {
   if (!app) {
     try {
+      console.log('Firebase Config:', firebaseConfig); // Debug line
+      if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
+        throw new Error('Firebase configuration is incomplete');
+      }
       app = initializeApp(firebaseConfig);
       auth = getAuth(app);
     } catch (error) {
