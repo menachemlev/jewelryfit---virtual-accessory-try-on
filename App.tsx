@@ -7,6 +7,7 @@ import { TutorialModal } from './components/TutorialModal';
 import { Logo } from './components/Logo';
 import { generateTryOnImage, detectAccessoryType, validateImageSuitability } from './services/geminiService';
 import { storageService } from './services/storageService';
+import { authService } from './services/authService';
 import { ImageState, ProcessingStatus, AccessoryType, User, HistoryItem, Language } from './types';
 import { translations } from './constants/translations';
 
@@ -56,9 +57,16 @@ const App: React.FC = () => {
 
   // Initialize Data
   useEffect(() => {
-    // Check Auth
-    const storedUser = storageService.getUser();
-    if (storedUser) setUser(storedUser);
+    // Subscribe to Firebase auth state changes
+    const unsubscribe = authService.onAuthStateChanged((firebaseUser) => {
+      if (firebaseUser) {
+        setUser(firebaseUser);
+        storageService.setUser(firebaseUser);
+      } else {
+        setUser(null);
+        storageService.setUser(null);
+      }
+    });
 
     // Load History
     setHistoryItems(storageService.getHistory());
@@ -81,6 +89,9 @@ const App: React.FC = () => {
       }
     };
     checkKey();
+
+    // Cleanup subscription
+    return () => unsubscribe();
   }, []);
 
   // Theme Effect
@@ -105,14 +116,36 @@ const App: React.FC = () => {
     setTheme(prev => prev === 'dark' ? 'light' : 'dark');
   };
 
-  const handleLogin = (provider: 'google' | 'facebook' | 'apple') => {
-    const newUser = storageService.login(provider);
-    setUser(newUser);
+  const handleLogin = async (provider: 'google' | 'facebook' | 'apple') => {
+    try {
+      let newUser: User;
+      
+      if (provider === 'google') {
+        newUser = await authService.loginWithGoogle();
+      } else if (provider === 'facebook') {
+        newUser = await authService.loginWithFacebook();
+      } else if (provider === 'apple') {
+        newUser = await authService.loginWithApple();
+      } else {
+        throw new Error('Unknown provider');
+      }
+      
+      setUser(newUser);
+      storageService.setUser(newUser);
+    } catch (error) {
+      console.error('Login error:', error);
+      throw error;
+    }
   };
 
-  const handleLogout = () => {
-    storageService.logout();
-    setUser(null);
+  const handleLogout = async () => {
+    try {
+      await authService.logout();
+      setUser(null);
+      storageService.setUser(null);
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
   };
 
   const handleSelectKey = async () => {

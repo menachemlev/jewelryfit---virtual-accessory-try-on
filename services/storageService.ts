@@ -40,8 +40,16 @@ export const storageService = {
     return data ? JSON.parse(data) : null;
   },
 
+  setUser: (user: User | null) => {
+    if (user) {
+      localStorage.setItem(KEYS.USER, JSON.stringify(user));
+    } else {
+      localStorage.removeItem(KEYS.USER);
+    }
+  },
+
   login: (provider: 'google' | 'facebook' | 'apple'): User => {
-    // Simulate a user based on provider
+    // Legacy support - will be replaced by real auth
     const user: User = {
       id: crypto.randomUUID(),
       name: `Demo User (${provider})`,
