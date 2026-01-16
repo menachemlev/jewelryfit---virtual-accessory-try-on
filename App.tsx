@@ -559,28 +559,28 @@ const App: React.FC = () => {
           
           <div className="flex items-center gap-2 md:gap-4 flex-wrap justify-center">
             {/* Language Toggle */}
-            <div className="flex gap-1 md:gap-2 bg-gray-200 dark:bg-gray-800 rounded-lg p-1">
+            <div className="flex gap-1 bg-gray-200 dark:bg-gray-800 rounded-lg p-1">
                 <button 
                   onClick={() => setLang('en')} 
-                  className={`px-2 md:px-3 py-1 text-xs md:text-sm font-medium rounded transition-all ${
+                  className={`px-2 py-1 text-xl md:text-2xl rounded transition-all ${
                     lang === 'en' 
-                      ? 'bg-yellow-500 text-black shadow-md' 
-                      : 'text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white'
+                      ? 'bg-yellow-500/30 shadow-md scale-110' 
+                      : 'opacity-50 grayscale hover:opacity-75'
                   }`}
                   title="English"
                 >
-                  EN
+                  🇺🇸
                 </button>
                 <button 
                   onClick={() => setLang('he')} 
-                  className={`px-2 md:px-3 py-1 text-xs md:text-sm font-medium rounded transition-all ${
+                  className={`px-2 py-1 text-xl md:text-2xl rounded transition-all ${
                     lang === 'he' 
-                      ? 'bg-yellow-500 text-black shadow-md' 
-                      : 'text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white'
+                      ? 'bg-yellow-500/30 shadow-md scale-110' 
+                      : 'opacity-50 grayscale hover:opacity-75'
                   }`}
-                  title="Hebrew"
+                  title="עברית"
                 >
-                  HE
+                  🇮🇱
                 </button>
             </div>
 

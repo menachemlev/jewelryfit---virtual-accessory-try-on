@@ -76,28 +76,28 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4 relative overflow-hidden transition-colors duration-300">
       
       {/* Language Toggle */}
-      <div className="absolute top-4 right-4 z-50 flex gap-1 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-lg p-1 shadow-lg">
+      <div className="absolute top-4 right-4 z-50 flex gap-1.5 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-lg p-1.5 shadow-lg">
          <button 
            onClick={() => setLang('en')} 
-           className={`px-3 py-1.5 text-sm font-medium rounded transition-all ${
+           className={`text-2xl md:text-3xl transition-all ${
              lang === 'en' 
-               ? 'bg-yellow-500 text-black shadow-md' 
-               : 'text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white'
+               ? 'scale-110 drop-shadow-lg' 
+               : 'opacity-50 grayscale hover:opacity-75 hover:scale-105'
            }`}
            title="English"
          >
-           EN
+           🇺🇸
          </button>
          <button 
            onClick={() => setLang('he')} 
-           className={`px-3 py-1.5 text-sm font-medium rounded transition-all ${
+           className={`text-2xl md:text-3xl transition-all ${
              lang === 'he' 
-               ? 'bg-yellow-500 text-black shadow-md' 
-               : 'text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white'
+               ? 'scale-110 drop-shadow-lg' 
+               : 'opacity-50 grayscale hover:opacity-75 hover:scale-105'
            }`}
-           title="Hebrew"
+           title="עברית"
          >
-           HE
+           🇮🇱
          </button>
       </div>
 
