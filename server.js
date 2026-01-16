@@ -178,10 +178,9 @@ app.post('/api/generate-try-on-image', async (req, res) => {
     // Select model based on complexity
     // Use pro model for difficult fingers (THUMB, PINKY, MIDDLE) on rings
     const useProModel = type === 'RING' && (finger !== 'RING');
-    const modelName = useProModel ? 'gemini-3-pro-image-preview' : 'gemini-2.5-flash-image';
-    console.log('useProModel:', ai.models.ListModels ().then(models => {
-      console.log(models);
-    }))
+    //const modelName = useProModel ? 'gemini-3-pro-image-preview' : 'gemini-2.5-flash-image';
+    
+    const modelName = 'gemini-2.5-flash-image';
 
     const response = await callWithRetry(() => ai.models.generateContent({
       model: modelName,
