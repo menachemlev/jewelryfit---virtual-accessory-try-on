@@ -1,4 +1,4 @@
-import dbService from '../../../../database.js';
+import serverlessDbService from '../../../serverless-db.js';
 import { authenticateToken, setCorsHeaders, handleOptions } from '../../_middleware.js';
 
 /**
@@ -28,7 +28,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'amount is required' });
     }
 
-    const newCredits = dbService.addCredits(userId, amount);
+    const newCredits = serverlessDbService.addCredits(userId, amount);
     res.json({ success: true, credits: newCredits });
   } catch (error) {
     console.error('Error in add credits:', error);

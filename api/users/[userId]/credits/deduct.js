@@ -1,4 +1,4 @@
-import dbService from '../../../../database.js';
+import serverlessDbService from '../../../serverless-db.js';
 import { authenticateToken, setCorsHeaders, handleOptions } from '../../_middleware.js';
 
 /**
@@ -24,13 +24,13 @@ export default async function handler(req, res) {
       return res.status(403).json({ error: 'Unauthorized access to user data' });
     }
 
-    const success = dbService.deductCredits(userId, amount);
+    const success = serverlessDbService.deductCredits(userId, amount);
     
     if (!success) {
       return res.status(402).json({ error: 'Insufficient credits' });
     }
 
-    const newCredits = dbService.getUserCredits(userId);
+    const newCredits = serverlessDbService.getUserCredits(userId);
     res.json({ success: true, credits: newCredits });
   } catch (error) {
     console.error('Error in deduct credits:', error);

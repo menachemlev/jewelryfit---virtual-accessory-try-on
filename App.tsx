@@ -512,7 +512,7 @@ const App: React.FC = () => {
 
   // 3. Main App
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-100 via-white to-gray-200 dark:from-gray-900 dark:via-gray-800 dark:to-black text-gray-900 dark:text-white p-4 md:p-8 transition-colors duration-300">
+    <div className="min-h-screen bg-gradient-to-br from-gray-100 via-white to-gray-200 dark:from-gray-900 dark:via-gray-800 dark:to-black text-gray-900 dark:text-white p-4 md:p-8 transition-colors duration-300 overflow-x-hidden w-full">
       
       {/* Modals */}
       <TutorialModal 
@@ -546,7 +546,7 @@ const App: React.FC = () => {
         lang={lang}
       />
 
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-7xl mx-auto w-full">
         {/* Header */}
         <header className="mb-8 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">

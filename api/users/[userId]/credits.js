@@ -1,4 +1,4 @@
-import dbService from '../../../database.js';
+import serverlessDbService from '../../serverless-db.js';
 import { authenticateToken, setCorsHeaders, handleOptions } from '../_middleware.js';
 
 /**
@@ -23,7 +23,7 @@ export default async function handler(req, res) {
       return res.status(403).json({ error: 'Unauthorized access to user data' });
     }
 
-    const credits = dbService.getUserCredits(userId);
+    const credits = serverlessDbService.getUserCredits(userId);
     res.json({ credits });
   } catch (error) {
     console.error('Error in get credits:', error);

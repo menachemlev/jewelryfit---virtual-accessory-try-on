@@ -2,7 +2,10 @@
 <html lang="en" class="dark">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>JewelryFit - Virtual Try-On</title>
     <!-- High Resolution SVG Favicon -->
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23F59E0B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 3H18L21 8L12 17L3 8L6 3Z'/%3E%3Cpath d='M3 8H21' stroke-width='1.5'/%3E%3Cpath d='M12 17L6 3' stroke-width='1.5'/%3E%3Cpath d='M12 17L18 3' stroke-width='1.5'/%3E%3Cpath d='M19.07 13C19.66 14.16 20 15.46 20 16.85C20 20.7 16.4 23.85 12 23.85C7.6 23.85 4 20.7 4 16.85C4 15.46 4.34 14.16 4.93 13'/%3E%3C/svg%3E" />
@@ -48,6 +51,22 @@
       }
       :not(.dark) ::-webkit-scrollbar-thumb:hover {
         background: #6b7280;
+      }
+
+      /* Mobile viewport fixes */
+      html, body {
+        overflow-x: hidden;
+        width: 100%;
+        position: relative;
+      }
+      
+      * {
+        -webkit-tap-highlight-color: transparent;
+      }
+      
+      /* Prevent zoom on input focus */
+      input, select, textarea {
+        font-size: 16px !important;
       }
     </style>
   <script type="importmap">

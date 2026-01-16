@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken';
-import dbService from '../../database.js';
+import serverlessDbService from '../serverless-db.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'default_secret_change_in_production';
 
@@ -35,7 +35,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'userId is required' });
     }
 
-    const user = dbService.getOrCreateUser(userId, { email, name, provider });
+    const user = serverlessDbService.getOrCreateUser(userId, { email, name, provider });
     
     // Generate JWT token
     const token = generateToken(user.id);
