@@ -1,17 +1,29 @@
 import { AccessoryType, Language, Finger, RingSize } from "../types";
+import { authToken } from './authService';
 
 // Server URL - can be configured via environment variable
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
-// Helper function to call the server API
+// Helper function to call the server API with JWT authentication
 const callServerAPI = async <T>(endpoint: string, payload: any): Promise<T> => {
+  const token = authToken.get();
+  
+  if (!token) {
+    throw new Error('Authentication required. Please log in.');
+  }
+  
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
     },
     body: JSON.stringify(payload),
   });
+
+  if (response.status === 401 || response.status === 403) {
+    throw new Error('Authentication failed. Please log in again.');
+  }
 
   if (!response.ok) {
     const error = await response.json();

@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import jwt from 'jsonwebtoken';
 import { GoogleGenAI, Type } from '@google/genai';
 import dbService from './database.js';
 
@@ -8,6 +9,7 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const JWT_SECRET = process.env.JWT_SECRET || 'default_secret_change_in_production';
 
 // Middleware
 app.use(express.json({ limit: '50mb' }));
@@ -16,6 +18,29 @@ app.use(cors({
   origin: process.env.CLIENT_URL || 'http://localhost:5173',
   credentials: true
 }));
+
+// JWT Token Generation
+const generateToken = (userId) => {
+  return jwt.sign({ userId }, JWT_SECRET, { expiresIn: '7d' });
+};
+
+// Auth Middleware
+const authenticateToken = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+
+  if (!token) {
+    return res.status(401).json({ error: 'Access token required' });
+  }
+
+  jwt.verify(token, JWT_SECRET, (err, decoded) => {
+    if (err) {
+      return res.status(403).json({ error: 'Invalid or expired token' });
+    }
+    req.userId = decoded.userId;
+    next();
+  });
+};
 
 // Initialize Gemini client (Server-side only)
 const getGeminiClient = () => {
@@ -49,7 +74,7 @@ const callWithRetry = async (fn, retries = 3, delay = 1000) => {
 
 /**
  * POST /api/users/register
- * Create or get user and return with credits
+ * Create or get user and return with credits and JWT token
  */
 app.post('/api/users/register', async (req, res) => {
   try {
@@ -60,12 +85,17 @@ app.post('/api/users/register', async (req, res) => {
     }
 
     const user = dbService.getOrCreateUser(userId, { email, name, provider });
+    
+    // Generate JWT token
+    const token = generateToken(user.id);
+    
     res.json({ 
       id: user.id,
       email: user.email,
       name: user.name,
       provider: user.provider,
-      credits: user.credits 
+      credits: user.credits,
+      token
     });
   } catch (error) {
     console.error('Error in users/register:', error);
@@ -77,12 +107,13 @@ app.post('/api/users/register', async (req, res) => {
  * GET /api/users/:userId/credits
  * Get user's current credit balance
  */
-app.get('/api/users/:userId/credits', async (req, res) => {
+app.get('/api/users/:userId/credits', authenticateToken, async (req, res) => {
   try {
     const { userId } = req.params;
     
-    if (!userId) {
-      return res.status(400).json({ error: 'userId is required' });
+    // Verify the userId matches the authenticated user
+    if (userId !== req.userId) {
+      return res.status(403).json({ error: 'Unauthorized access to user data' });
     }
 
     const credits = dbService.getUserCredits(userId);
@@ -97,13 +128,14 @@ app.get('/api/users/:userId/credits', async (req, res) => {
  * POST /api/users/:userId/credits/deduct
  * Deduct credits from user
  */
-app.post('/api/users/:userId/credits/deduct', async (req, res) => {
+app.post('/api/users/:userId/credits/deduct', authenticateToken, async (req, res) => {
   try {
     const { userId } = req.params;
     const { amount = 1 } = req.body;
     
-    if (!userId) {
-      return res.status(400).json({ error: 'userId is required' });
+    // Verify the userId matches the authenticated user
+    if (userId !== req.userId) {
+      return res.status(403).json({ error: 'Unauthorized access to user data' });
     }
 
     const success = dbService.deductCredits(userId, amount);
@@ -124,13 +156,18 @@ app.post('/api/users/:userId/credits/deduct', async (req, res) => {
  * POST /api/users/:userId/credits/add
  * Add credits to user
  */
-app.post('/api/users/:userId/credits/add', async (req, res) => {
+app.post('/api/users/:userId/credits/add', authenticateToken, async (req, res) => {
   try {
     const { userId } = req.params;
     const { amount } = req.body;
     
-    if (!userId || !amount) {
-      return res.status(400).json({ error: 'userId and amount are required' });
+    // Verify the userId matches the authenticated user
+    if (userId !== req.userId) {
+      return res.status(403).json({ error: 'Unauthorized access to user data' });
+    }
+    
+    if (!amount) {
+      return res.status(400).json({ error: 'amount is required' });
     }
 
     const newCredits = dbService.addCredits(userId, amount);
@@ -145,7 +182,7 @@ app.post('/api/users/:userId/credits/add', async (req, res) => {
  * POST /api/detect-accessory-type
  * Detects the type of accessory (WATCH, BRACELET, or RING)
  */
-app.post('/api/detect-accessory-type', async (req, res) => {
+app.post('/api/detect-accessory-type', authenticateToken, async (req, res) => {
   try {
     const { baseImage } = req.body;
     
@@ -184,7 +221,7 @@ app.post('/api/detect-accessory-type', async (req, res) => {
  * POST /api/validate-image-suitability
  * Validates if the image is suitable for try-on
  */
-app.post('/api/validate-image-suitability', async (req, res) => {
+app.post('/api/validate-image-suitability', authenticateToken, async (req, res) => {
   try {
     const { baseImage, type } = req.body;
     
@@ -235,7 +272,7 @@ app.post('/api/validate-image-suitability', async (req, res) => {
  * POST /api/generate-try-on-image
  * Generates the try-on image with accessory placed on the base image
  */
-app.post('/api/generate-try-on-image', async (req, res) => {
+app.post('/api/generate-try-on-image', authenticateToken, async (req, res) => {
   try {
     const { baseImage, accessoryImage, type, finger = 'RING' } = req.body;
     

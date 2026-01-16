@@ -48,6 +48,26 @@ let auth: Auth | null = null;
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
+// Token management
+const getAuthToken = (): string | null => {
+  return localStorage.getItem('jwt_token');
+};
+
+const setAuthToken = (token: string): void => {
+  localStorage.setItem('jwt_token', token);
+};
+
+const removeAuthToken = (): void => {
+  localStorage.removeItem('jwt_token');
+};
+
+// Export for use in other services
+export const authToken = {
+  get: getAuthToken,
+  set: setAuthToken,
+  remove: removeAuthToken
+};
+
 const convertFirebaseUserToAppUser = async (firebaseUser: FirebaseUser, provider: string): Promise<User> => {
   try {
     // Register/sync user with backend database
@@ -67,6 +87,11 @@ const convertFirebaseUserToAppUser = async (firebaseUser: FirebaseUser, provider
     }
 
     const userData = await response.json();
+    
+    // Store JWT token
+    if (userData.token) {
+      setAuthToken(userData.token);
+    }
     
     return {
       id: userData.id,
@@ -160,6 +185,8 @@ export const authService = {
 
     try {
       await signOut(authInstance);
+      // Remove JWT token on logout
+      removeAuthToken();
     } catch (error: any) {
       console.error('Logout error:', error);
       throw new Error(error.message || 'Logout failed');

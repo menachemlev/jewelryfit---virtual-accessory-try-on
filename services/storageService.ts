@@ -1,4 +1,5 @@
 import { HistoryItem, RateLimitState, User, Language, AccessoryType } from '../types';
+import { authToken } from './authService';
 
 const KEYS = {
   USER: 'chronofit_user',
@@ -118,12 +119,26 @@ export const storageService = {
     const user = storageService.getUser();
     if (!user) return false;
     
+    const token = authToken.get();
+    if (!token) {
+      console.error('No authentication token available');
+      return false;
+    }
+    
     try {
       const response = await fetch(`${API_URL}/api/users/${user.id}/credits/deduct`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ amount })
       });
+
+      if (response.status === 401 || response.status === 403) {
+        console.error('Authentication failed');
+        return false;
+      }
 
       if (response.status === 402) {
         // Insufficient credits
@@ -151,12 +166,24 @@ export const storageService = {
     const user = storageService.getUser();
     if (!user) return;
     
+    const token = authToken.get();
+    if (!token) {
+      throw new Error('No authentication token available');
+    }
+    
     try {
       const response = await fetch(`${API_URL}/api/users/${user.id}/credits/add`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ amount })
       });
+
+      if (response.status === 401 || response.status === 403) {
+        throw new Error('Authentication failed');
+      }
 
       if (!response.ok) {
         throw new Error('Failed to add credits');
@@ -178,8 +205,18 @@ export const storageService = {
     const user = storageService.getUser();
     if (!user) return 0;
     
+    const token = authToken.get();
+    if (!token) {
+      console.error('No authentication token available');
+      return user.credits; // Return cached value
+    }
+    
     try {
-      const response = await fetch(`${API_URL}/api/users/${user.id}/credits`);
+      const response = await fetch(`${API_URL}/api/users/${user.id}/credits`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       
       if (!response.ok) {
         throw new Error('Failed to fetch credits');
