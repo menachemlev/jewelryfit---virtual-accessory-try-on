@@ -56,14 +56,14 @@ export default async function handler(req, res) {
     // Create prompts based on language
     const prompts = {
       en: {
-        WATCH: "Analyze this image where a watch has been placed on a wrist. Provide a brief, friendly review (2-3 sentences) about how well the watch fits and looks. Comment on size proportion, positioning, and overall aesthetic. Be encouraging but honest.",
-        BRACELET: "Analyze this image where a bracelet has been placed on a wrist. Provide a brief, friendly review (2-3 sentences) about how well the bracelet fits and looks. Comment on size proportion, positioning, and overall aesthetic. Be encouraging but honest.",
-        RING: "Analyze this image where a ring has been placed on a finger. Provide a brief, friendly review (2-3 sentences) about how well the ring fits and looks. Comment on size proportion, positioning, and overall aesthetic. Be encouraging but honest."
+        WATCH: "Analyze this image where a watch has been placed on a wrist. Provide a brief, honest review (2-3 sentences) about how well the watch fits and looks. Be objective and critical - point out specific issues with size proportion, positioning, style match, or overall aesthetic if you see any. If it looks good, say so, but don't hesitate to mention what could be improved or if something doesn't look well.",
+        BRACELET: "Analyze this image where a bracelet has been placed on a wrist. Provide a brief, honest review (2-3 sentences) about how well the bracelet fits and looks. Be objective and critical - point out specific issues with size proportion, positioning, style match, or overall aesthetic if you see any. If it looks good, say so, but don't hesitate to mention what could be improved or if something doesn't look well.",
+        RING: "Analyze this image where a ring has been placed on a finger. Provide a brief, honest review (2-3 sentences) about how well the ring fits and looks. Be objective and critical - point out specific issues with size proportion, positioning, style match, or overall aesthetic if you see any. If it looks good, say so, but don't hesitate to mention what could be improved or if something doesn't look well."
       },
       he: {
-        WATCH: "נתח את התמונה שבה שעון הוצבעל פרק יד. תן ביקורת קצרה וידידותית (2-3 משפטים) על כמה טוב השעון מתאים ונראה. התייחס לפרופורציות הגודל, המיקום, והמראה הכללי. היה מעודד אך כן.",
-        BRACELET: "נתח את התמונה שבה צמיד הוצב על פרק יד. תן ביקורת קצרה וידידותית (2-3 משפטים) על כמה טוב הצמיד מתאים ונראה. התייחס לפרופורציות הגודל, המיקום, והמראה הכללי. היה מעודד אך כן.",
-        RING: "נתח את התמונה שבה טבעת הוצבה על אצבע. תן ביקורת קצרה וידידותית (2-3 משפטים) על כמה טוב הטבעת מתאימה ונראית. התייחס לפרופורציות הגודל, המיקום, והמראה הכללי. היה מעודד אך כן."
+        WATCH: "נתח את התמונה שבה שעון הוצב על פרק יד. תן ביקורת קצרה וכנה (2-3 משפטים) על כמה טוב השעון מתאים ונראה. היה אובייקטיבי וביקורתי - ציין בעיות ספציפיות בפרופורציות הגודל, המיקום, התאמת הסגנון, או המראה הכללי אם אתה רואה כאלה. אם זה נראה טוב, אמור זאת, אך אל תהסס להזכיר מה אפשר לשפר או אם משהו לא נראה טוב.",
+        BRACELET: "נתח את התמונה שבה צמיד הוצב על פרק יד. תן ביקורת קצרה וכנה (2-3 משפטים) על כמה טוב הצמיד מתאים ונראה. היה אובייקטיבי וביקורתי - ציין בעיות ספציפיות בפרופורציות הגודל, המיקום, התאמת הסגנון, או המראה הכללי אם אתה רואה כאלה. אם זה נראה טוב, אמור זאת, אך אל תהסס להזכיר מה אפשר לשפר או אם משהו לא נראה טוב.",
+        RING: "נתח את התמונה שבה טבעת הוצבה על אצבע. תן ביקורת קצרה וכנה (2-3 משפטים) על כמה טוב הטבעת מתאימה ונראית. היה אובייקטיבי וביקורתי - ציין בעיות ספציפיות בפרופורציות הגודל, המיקום, התאמת הסגנון, או המראה הכללי אם אתה רואה כאלה. אם זה נראה טוב, אמור זאת, אך אל תהסס להזכיר מה אפשר לשפר או אם משהו לא נראה טוב."
       }
     };
 
