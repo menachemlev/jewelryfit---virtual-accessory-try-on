@@ -158,7 +158,7 @@ export const translations = {
     confirmPassword: "אימות סיסמה",
     fullName: "שם מלא",
     enterName: "הזן את שמך",
-    enterEmail: "הזן את דוא״לך",
+    enterEmail: "הזן את הדוא״ל שלך",
     enterPassword: "הזן סיסמה (מינימום 6 תווים)",
     confirmPasswordPlaceholder: "הזן סיסמה שוב",
     signIn: "התחבר",
