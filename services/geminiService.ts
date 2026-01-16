@@ -1,4 +1,4 @@
-import { AccessoryType, Language, Finger } from "../types";
+import { AccessoryType, Language, Finger, RingSize } from "../types";
 
 // Server URL - can be configured via environment variable
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
@@ -76,7 +76,8 @@ export const generateTryOnImage = async (
   baseImageBase64: string, 
   accessoryImageBase64: string, 
   type: AccessoryType,
-  finger: Finger = 'RING'
+  finger: Finger = 'RING',
+  ringSize: RingSize = '58'
 ): Promise<string> => {
   try {
     const result = await callServerAPI<{ image: string }>(
@@ -85,7 +86,8 @@ export const generateTryOnImage = async (
         baseImage: baseImageBase64,
         accessoryImage: accessoryImageBase64,
         type,
-        finger
+        finger,
+        ringSize
       }
     );
     return result.image;

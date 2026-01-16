@@ -18,6 +18,8 @@ export type AccessoryType = 'WATCH' | 'BRACELET' | 'RING';
 
 export type Finger = 'THUMB' | 'INDEX' | 'MIDDLE' | 'RING' | 'PINKY';
 
+export type RingSize = '53' | '54' | '55' | '56' | '57' | '58' | '59' | '60' | '61' | '62' | '63' | '64' | '65' | '66';
+
 export interface User {
   id: string;
   name: string;

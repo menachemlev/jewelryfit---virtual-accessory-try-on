@@ -97,6 +97,8 @@ export const translations = {
     fluxKey: "Flux API Key (Optional)",
     save: "Save",
     selectFinger: "Select Finger",
+    selectRingSize: "Select Ring Size (EU)",
+    ringSizeInfo: "European ring size standard (circumference in mm)",
     fingers: {
       THUMB: "Thumb",
       INDEX: "Index",
@@ -242,6 +244,8 @@ export const translations = {
     fluxKey: "מפתח Flux API (אופציונלי)",
     save: "שמור",
     selectFinger: "בחר אצבע",
+    selectRingSize: "בחר מידת טבעת (EU)",
+    ringSizeInfo: "סטנדרט אירופי למידת טבעת (היקף במ\"מ)",
     fingers: {
       THUMB: "אגודל",
       INDEX: "אצבע",

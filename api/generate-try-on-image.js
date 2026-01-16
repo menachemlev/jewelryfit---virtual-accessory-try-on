@@ -43,7 +43,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { baseImage, accessoryImage, type, finger = 'RING' } = req.body;
+    const { baseImage, accessoryImage, type, finger = 'RING', ringSize = '58' } = req.body;
     
     if (!baseImage || !accessoryImage || !type) {
       return res.status(400).json({ error: 'baseImage, accessoryImage, and type are required' });
@@ -69,10 +69,11 @@ export default async function handler(req, res) {
       It should look natural, following the curvature of the wrist in the current perspective. Add realistic contact shadows. Adjust lighting to match the skin tone and environment.`;
     } else {
       const fingerName = finger.toLowerCase();
+      const ringCircumference = ringSize; // EU size = circumference in mm
       prompt = `A hyper-realistic photo editing task. The user has provided two images: 1) A photo of a person's hand (Base). 2) A photo of a ring (Accessory). 
       Task: Place the ring on the ${fingerName} finger of the hand in the Base image. 
       ${commonInstruction}
-      Position it at the base of the ${fingerName} finger where a ring naturally sits. Scale it to fit the finger width perfectly. Rotate it to align with the finger's direction in the current perspective. Add realistic shadows and reflections. Ensure the ring looks like it is encircling the finger.`;
+      Position it at the base of the ${fingerName} finger where a ring naturally sits. The ring size is EU ${ringCircumference} (${ringCircumference}mm circumference) - scale the ring to match this specific finger circumference perfectly. Rotate it to align with the finger's direction in the current perspective. Add realistic shadows and reflections. Ensure the ring looks like it is encircling the finger snugly.`;
     }
     
     // Use pro model for difficult fingers
