@@ -676,23 +676,6 @@ const App: React.FC = () => {
               </div>
             </div>
 
-            {/* Finger Selector (Conditional) */}
-            {accessoryType === 'RING' && (
-               <>
-                 <FingerSelector 
-                   selectedFinger={selectedFinger}
-                   onChange={setSelectedFinger}
-                   lang={lang}
-                 />
-                 <RingSizeSelector 
-                   selectedSize={ringSize}
-                   onChange={setRingSize}
-                   lang={lang}
-                   handImage={baseImage.base64}
-                   fingerType={selectedFinger}
-                 />
-               </>
-            )}
             
             <div className="space-y-6 mt-6">
               <div className="relative">
@@ -725,6 +708,24 @@ const App: React.FC = () => {
                 lang={lang}
               />
             </div>
+
+            {/* Finger Selector (Conditional) */}
+            {accessoryType === 'RING' && (
+               <>
+                 <FingerSelector 
+                   selectedFinger={selectedFinger}
+                   onChange={setSelectedFinger}
+                   lang={lang}
+                 />
+                 <RingSizeSelector 
+                   selectedSize={ringSize}
+                   onChange={setRingSize}
+                   lang={lang}
+                   handImage={baseImage.base64}
+                   fingerType={selectedFinger}
+                 />
+               </>
+            )}
 
             {errorMsg && (
               <div className="mt-6 p-4 bg-red-100 dark:bg-red-900/40 border border-red-200 dark:border-red-500/50 rounded-lg text-red-800 dark:text-red-200 text-sm">
