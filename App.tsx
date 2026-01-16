@@ -371,7 +371,7 @@ const App: React.FC = () => {
         accessoryType === 'RING' ? ringSize : undefined
       );
       
-      // Success
+      // Success - result generated successfully
       setResultImage(generatedImageBase64);
       setStatus(ProcessingStatus.SUCCESS);
       
@@ -380,15 +380,16 @@ const App: React.FC = () => {
       const updatedUser = storageService.getUser();
       if (updatedUser) setUser(updatedUser);
       
-      // Record Usage & History (Standard)
+      // Record Usage
       storageService.recordUsage();
       
+      // Save to history in Full HD quality (only after successful generation)
       const newHistoryItem: HistoryItem = {
         id: crypto.randomUUID(),
         timestamp: Date.now(),
         accessoryType,
         resultImage: generatedImageBase64,
-        accessoryImage: accessoryImage.base64,
+        accessoryImage: accessoryImage.base64!,
         isHD: false
       };
       

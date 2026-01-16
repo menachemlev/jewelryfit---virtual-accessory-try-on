@@ -20,7 +20,7 @@ const LIMITS = {
 };
 
 // Helper to compress image
-const compressImage = (base64: string, maxWidth = 400, quality = 0.6): Promise<string> => {
+const compressImage = (base64: string, maxWidth = 1920, maxHeight = 1080, quality = 0.85): Promise<string> => {
   return new Promise((resolve) => {
     const img = new Image();
     img.src = base64;
@@ -29,16 +29,13 @@ const compressImage = (base64: string, maxWidth = 400, quality = 0.6): Promise<s
       let w = img.width;
       let h = img.height;
       
-      // Scale down keeping aspect ratio
-      if (w > maxWidth || h > maxWidth) {
-        if (w > h) {
-          h = Math.round((h * maxWidth) / w);
-          w = maxWidth;
-        } else {
-          w = Math.round((w * maxWidth) / h);
-          h = maxWidth;
-        }
-      }
+      // Scale to Full HD (1920x1080) keeping aspect ratio
+      const widthRatio = maxWidth / w;
+      const heightRatio = maxHeight / h;
+      const ratio = Math.min(widthRatio, heightRatio, 1); // Don't upscale
+      
+      w = Math.round(w * ratio);
+      h = Math.round(h * ratio);
 
       canvas.width = w;
       canvas.height = h;
@@ -242,9 +239,9 @@ export const storageService = {
   },
 
   saveHistoryItem: async (item: HistoryItem) => {
-    // Compress images to save space
-    const compressedResult = await compressImage(item.resultImage);
-    const compressedAccessory = await compressImage(item.accessoryImage);
+    // Save images in Full HD resolution (1920x1080) with high quality
+    const compressedResult = await compressImage(item.resultImage, 1920, 1080, 0.85);
+    const compressedAccessory = await compressImage(item.accessoryImage, 1920, 1080, 0.85);
 
     const optimizedItem: HistoryItem = {
         ...item,
