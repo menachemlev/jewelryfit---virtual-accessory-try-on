@@ -79,7 +79,7 @@ export default async function handler(req, res) {
     // Use pro model for difficult fingers
     const useProModel = type === 'RING' && (finger !== 'RING');
     //const modelName = useProModel ? 'gemini-3-pro-image-preview' : 'gemini-2.5-flash-image';
-    const modelName = 'gemini-2.5-flash-image';
+    const modelName = 'gemini-3-pro-image-preview';
 
     const response = await callWithRetry(() => ai.models.generateContent({
       model: modelName,
