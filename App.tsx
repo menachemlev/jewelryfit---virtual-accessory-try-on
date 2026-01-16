@@ -559,9 +559,29 @@ const App: React.FC = () => {
           
           <div className="flex items-center gap-2 md:gap-4 flex-wrap justify-center">
             {/* Language Toggle */}
-            <div className="flex gap-1.5 md:gap-2">
-                <button onClick={() => setLang('en')} className={`text-lg md:text-xl hover:scale-110 transition-transform ${lang === 'en' ? 'opacity-100' : 'opacity-50 grayscale'}`} title="English">🇺🇸</button>
-                <button onClick={() => setLang('he')} className={`text-lg md:text-xl hover:scale-110 transition-transform ${lang === 'he' ? 'opacity-100' : 'opacity-50 grayscale'}`} title="Hebrew">🇮🇱</button>
+            <div className="flex gap-1 md:gap-2 bg-gray-200 dark:bg-gray-800 rounded-lg p-1">
+                <button 
+                  onClick={() => setLang('en')} 
+                  className={`px-2 md:px-3 py-1 text-xs md:text-sm font-medium rounded transition-all ${
+                    lang === 'en' 
+                      ? 'bg-yellow-500 text-black shadow-md' 
+                      : 'text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white'
+                  }`}
+                  title="English"
+                >
+                  EN
+                </button>
+                <button 
+                  onClick={() => setLang('he')} 
+                  className={`px-2 md:px-3 py-1 text-xs md:text-sm font-medium rounded transition-all ${
+                    lang === 'he' 
+                      ? 'bg-yellow-500 text-black shadow-md' 
+                      : 'text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white'
+                  }`}
+                  title="Hebrew"
+                >
+                  HE
+                </button>
             </div>
 
             {/* Theme Toggle */}

@@ -26,11 +26,28 @@ const callServerAPI = async <T>(endpoint: string, payload: any): Promise<T> => {
   }
 
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || `API error: ${response.status}`);
+    let errorMessage = `API error: ${response.status}`;
+    try {
+      const error = await response.json();
+      errorMessage = error.error || errorMessage;
+    } catch (parseError) {
+      // Response wasn't JSON, try to get text
+      try {
+        const text = await response.text();
+        errorMessage = text || errorMessage;
+      } catch (textError) {
+        // Keep default error message
+      }
+    }
+    throw new Error(errorMessage);
   }
 
-  return response.json() as Promise<T>;
+  try {
+    return await response.json() as Promise<T>;
+  } catch (parseError) {
+    console.error('Failed to parse JSON response:', parseError);
+    throw new Error('Invalid response format from server');
+  }
 };
 
 // --- IMAGE PROCESSING HELPERS ---

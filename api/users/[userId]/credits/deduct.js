@@ -24,6 +24,16 @@ export default async function handler(req, res) {
       return res.status(403).json({ error: 'Unauthorized access to user data' });
     }
 
+    // Check if user has unlimited credits
+    const unlimited_credits_users = process.env.UNLIMITED_CREDITS_USERS_LIST?.split(',').map(id => id.trim()) || [];
+    const isUnlimited = unlimited_credits_users.includes(userId);
+    
+    if (isUnlimited) {
+      // Don't deduct credits for unlimited users, just return current credits
+      const currentCredits = serverlessDbService.getUserCredits(userId);
+      return res.json({ success: true, credits: currentCredits > 0 ? currentCredits : 1000 });
+    }
+    
     const success = serverlessDbService.deductCredits(userId, amount);
     
     if (!success) {
