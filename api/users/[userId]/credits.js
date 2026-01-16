@@ -24,7 +24,8 @@ export default async function handler(req, res) {
     }
 
     const credits = serverlessDbService.getUserCredits(userId);
-    res.json({ credits });
+    const unlimited_credits_users = process.env.UNLIMITED_CREDITS_USERS_LIST?.split(',') || [];
+    res.json({ credits: unlimited_credits_users.includes(requestedUserId) ? 1000 : credits });
   } catch (error) {
     console.error('Error in get credits:', error);
     if (error.message === 'Access token required') {
