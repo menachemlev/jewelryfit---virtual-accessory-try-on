@@ -7,6 +7,7 @@ import { TutorialModal } from './components/TutorialModal';
 import { PaymentModal } from './components/PaymentModal';
 import { FingerSelector } from './components/FingerSelector';
 import { Logo } from './components/Logo';
+import { JewelryReview } from './components/JewelryReview';
 import { generateTryOnImage, detectAccessoryType, validateImageSuitability } from './services/geminiService';
 import { storageService } from './services/storageService';
 import { ImageState, ProcessingStatus, AccessoryType, User, HistoryItem, Language, Finger } from './types';
@@ -330,6 +331,13 @@ const App: React.FC = () => {
       return;
     }
 
+    // Check if user has enough credits
+    if (!user || user.credits < 1) {
+      setErrorMsg(t.insufficientFunds);
+      setPaymentModalOpen(true);
+      return;
+    }
+
     // Rate Limit Check
     const rateCheck = storageService.checkRateLimit();
     if (!rateCheck.allowed) {
@@ -354,6 +362,11 @@ const App: React.FC = () => {
       // Success
       setResultImage(generatedImageBase64);
       setStatus(ProcessingStatus.SUCCESS);
+      
+      // Deduct 1 credit
+      storageService.deductCredit(1);
+      const updatedUser = storageService.getUser();
+      if (updatedUser) setUser(updatedUser);
       
       // Record Usage & History (Standard)
       storageService.recordUsage();
@@ -560,6 +573,16 @@ const App: React.FC = () => {
               <span className="text-xs font-medium text-gray-700 dark:text-gray-300">{user.name}</span>
             </div>
 
+            {/* Credits Display */}
+            <button
+              onClick={handleOpenPayment}
+              className="flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-yellow-400 to-yellow-500 hover:from-yellow-500 hover:to-yellow-600 rounded-full border border-yellow-600 shadow-md hover:shadow-lg transition-all cursor-pointer"
+              title={t.buyCredits}
+            >
+              <span className="text-lg">💎</span>
+              <span className="text-sm font-bold text-gray-900">{user.credits}</span>
+            </button>
+
             <button 
               onClick={() => setShowHistory(true)}
               className="p-2 text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-800 rounded-lg transition-colors relative"
@@ -689,7 +712,9 @@ const App: React.FC = () => {
                    {t.analyzing}
                 </span>
               ) : (
-                `${t.generate} ${t.types[accessoryType]}`
+                <span className="flex items-center justify-center gap-2">
+                  {`${t.generateCost} ${t.types[accessoryType]}`}
+                </span>
               )}
             </button>
           </section>
@@ -783,14 +808,23 @@ const App: React.FC = () => {
             </div>
 
             {resultImage && (
-              <div className="mt-6 flex justify-end">
-                 <button
-                  onClick={handleReset}
-                  className="text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white text-sm font-medium underline decoration-gray-400 dark:decoration-gray-600 hover:decoration-black dark:hover:decoration-white underline-offset-4 transition-all"
-                >
-                  {t.startOver}
-                </button>
-              </div>
+              <>
+                {/* AI Review Section */}
+                <JewelryReview 
+                  resultImage={resultImage} 
+                  language={lang}
+                  accessoryType={accessoryType}
+                />
+                
+                <div className="mt-6 flex justify-end">
+                  <button
+                    onClick={handleReset}
+                    className="text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white text-sm font-medium underline decoration-gray-400 dark:decoration-gray-600 hover:decoration-black dark:hover:decoration-white underline-offset-4 transition-all"
+                  >
+                    {t.startOver}
+                  </button>
+                </div>
+              </>
             )}
           </section>
         </main>

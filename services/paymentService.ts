@@ -32,7 +32,13 @@ export const paymentService = {
   /**
    * Simulates a payment transaction to an external provider.
    */
-  processPayment: async (amount: number, method: 'card' | 'paypal', details: any): Promise<{ success: boolean; error?: string }> => {
+  processPayment: async (
+    amount: number, 
+    method: 'card' | 'paypal', 
+    details: any, 
+    price?: number, 
+    currency?: string
+  ): Promise<{ success: boolean; error?: string }> => {
     return new Promise((resolve) => {
       setTimeout(() => {
         // 1. Validation Logic
@@ -45,6 +51,8 @@ export const paymentService = {
 
         // 2. Simulate Success for Demo purposes
         // In a real app, this would fetch() to a backend endpoint.
+        // For PayPal, you would integrate PayPal SDK and get redirected
+        console.log(`Mock payment: ${amount} diamonds for ${currency}${price}`);
         resolve({ success: true });
       }, 2500); // 2.5s delay to simulate network latency and processing time
     });

@@ -35,11 +35,19 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onP
   if (!isOpen) return null;
 
   const tiers = [
-    { diamonds: 2, price: lang === 'he' ? 3.5 : 1, popular: false },
-    { diamonds: 5, price: lang === 'he' ? 7 : 2, popular: true },
-    { diamonds: 10, price: lang === 'he' ? 13 : 3.5, popular: false },
-    { diamonds: 20, price: lang === 'he' ? 20 : 6, popular: false },
+    { diamonds: 1, priceUSD: 0.6, priceILS: 2, popular: false },
+    { diamonds: 3, priceUSD: 1.5, priceILS: 5, popular: true },
+    { diamonds: 7, priceUSD: 3, priceILS: 10, popular: false },
+    { diamonds: 20, priceUSD: 6, priceILS: 20, popular: false },
   ];
+
+  const getPrice = (tier: typeof tiers[0]) => {
+    return lang === 'he' ? tier.priceILS : tier.priceUSD;
+  };
+
+  const getCurrency = () => {
+    return lang === 'he' ? '₪' : '$';
+  };
 
   const handleCardChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let val = e.target.value.replace(/\D/g, '');
@@ -68,7 +76,16 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onP
     setErrorMsg('');
 
     try {
-      const result = await paymentService.processPayment(selectedTier, method, { number: cardNumber });
+      const selectedTierObj = tiers.find(t => t.diamonds === selectedTier);
+      if (!selectedTierObj) return;
+
+      const result = await paymentService.processPayment(
+        selectedTier, 
+        method, 
+        { number: cardNumber },
+        getPrice(selectedTierObj),
+        getCurrency()
+      );
       
       if (result.success) {
         setStatus('success');
@@ -145,7 +162,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onP
                   <span>💎</span> {tier.diamonds}
                 </div>
                 <div className="text-sm font-medium text-gray-600 dark:text-gray-300">
-                   {t.payment.currency}{tier.price.toFixed(2)}
+                   {getCurrency()}{getPrice(tier).toFixed(lang === 'he' ? 0 : 2)}
                 </div>
               </button>
             ))}
@@ -224,9 +241,9 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onP
 
           {method === 'paypal' && (
              <div className="bg-blue-50 dark:bg-[#003087]/20 border border-blue-100 dark:border-blue-900 p-6 rounded-xl flex flex-col items-center justify-center gap-3 text-center animate-fade-in min-h-[160px]">
-                <p className="text-sm text-gray-600 dark:text-gray-300">Proceed to PayPal to complete your purchase securely.</p>
+                <p className="text-sm text-gray-600 dark:text-gray-300">{lang === 'he' ? 'עבור ל-PayPal כדי להשלים את הרכישה בצורה מאובטחת.' : 'Proceed to PayPal to complete your purchase securely.'}</p>
                 <div className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-                    {t.payment.currency}{selectedTierData?.price.toFixed(2)}
+                    {getCurrency()}{selectedTierData ? getPrice(selectedTierData).toFixed(lang === 'he' ? 0 : 2) : '0'}
                 </div>
                 {/* Visual PayPal button (Mock) */}
                 <button className="bg-[#FFC439] hover:bg-[#F4BB35] text-blue-900 font-bold py-2 px-8 rounded-full shadow-sm transition-colors w-2/3">
@@ -241,7 +258,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onP
         <div className="p-5 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex justify-between items-center">
             <div className="text-sm font-medium">
                <span className="text-gray-500 dark:text-gray-400">{t.payment.pay}: </span>
-               <span className="text-lg font-bold text-gray-900 dark:text-white">{t.payment.currency}{selectedTierData?.price.toFixed(2)}</span>
+               <span className="text-lg font-bold text-gray-900 dark:text-white">{getCurrency()}{selectedTierData ? getPrice(selectedTierData).toFixed(lang === 'he' ? 0 : 2) : '0'}</span>
             </div>
             <button
                onClick={handlePay}
