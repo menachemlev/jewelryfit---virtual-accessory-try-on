@@ -47,12 +47,16 @@ let auth: Auth | null = null;
   };
 
 const convertFirebaseUserToAppUser = (firebaseUser: FirebaseUser, provider: string): User => {
+  // Check if user already exists in storage to preserve credits
+  const existingUser = localStorage.getItem('chronofit_user');
+  const existingCredits = existingUser ? JSON.parse(existingUser).credits : 5; // Default 5 diamonds for new users
+  
   return {
     id: firebaseUser.uid,
     name: firebaseUser.displayName || 'User',
     email: firebaseUser.email || '',
     provider: provider as 'google' | 'email',
-    credits: 0,
+    credits: existingCredits,
   };
 };
 
