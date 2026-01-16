@@ -677,7 +677,7 @@ const App: React.FC = () => {
             </div>
 
             
-            <div className="space-y-6 mt-6">
+            <div className="space-y-6 mt-6 mb-4">
               <div className="relative">
                  {/* Photo Guide Button */}
                 <button
