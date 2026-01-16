@@ -9,6 +9,8 @@ const KEYS = {
   FLUX_CONFIG: 'chronofit_flux_config'
 };
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+
 const LIMITS = {
   SHORT_WINDOW_MS: 60 * 1000, // 1 minute
   SHORT_MAX: 8, // conservative limit for 1 minute
@@ -112,20 +114,87 @@ export const storageService = {
   },
 
   // Credit Management
-  deductCredit: (amount: number = 1): boolean => {
+  deductCredit: async (amount: number = 1): Promise<boolean> => {
     const user = storageService.getUser();
-    if (!user || user.credits < amount) return false;
+    if (!user) return false;
     
-    user.credits -= amount;
-    localStorage.setItem(KEYS.USER, JSON.stringify(user));
-    return true;
+    try {
+      const response = await fetch(`${API_URL}/api/users/${user.id}/credits/deduct`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount })
+      });
+
+      if (response.status === 402) {
+        // Insufficient credits
+        return false;
+      }
+
+      if (!response.ok) {
+        throw new Error('Failed to deduct credits');
+      }
+
+      const data = await response.json();
+      
+      // Update local user object with new credits
+      user.credits = data.credits;
+      localStorage.setItem(KEYS.USER, JSON.stringify(user));
+      
+      return true;
+    } catch (error) {
+      console.error('Error deducting credits:', error);
+      return false;
+    }
   },
 
-  addCredits: (amount: number) => {
+  addCredits: async (amount: number): Promise<void> => {
     const user = storageService.getUser();
-    if (user) {
-        user.credits += amount;
-        localStorage.setItem(KEYS.USER, JSON.stringify(user));
+    if (!user) return;
+    
+    try {
+      const response = await fetch(`${API_URL}/api/users/${user.id}/credits/add`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to add credits');
+      }
+
+      const data = await response.json();
+      
+      // Update local user object with new credits
+      user.credits = data.credits;
+      localStorage.setItem(KEYS.USER, JSON.stringify(user));
+    } catch (error) {
+      console.error('Error adding credits:', error);
+      throw error;
+    }
+  },
+
+  // Fetch current credits from database
+  fetchCredits: async (): Promise<number> => {
+    const user = storageService.getUser();
+    if (!user) return 0;
+    
+    try {
+      const response = await fetch(`${API_URL}/api/users/${user.id}/credits`);
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch credits');
+      }
+
+      const data = await response.json();
+      
+      // Update local user object with fetched credits
+      user.credits = data.credits;
+      localStorage.setItem(KEYS.USER, JSON.stringify(user));
+      
+      return data.credits;
+    } catch (error) {
+      console.error('Error fetching credits:', error);
+      return user.credits; // Return cached value on error
     }
   },
 

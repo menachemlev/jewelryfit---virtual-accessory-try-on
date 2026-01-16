@@ -46,18 +46,46 @@ let auth: Auth | null = null;
     return { app, auth };
   };
 
-const convertFirebaseUserToAppUser = (firebaseUser: FirebaseUser, provider: string): User => {
-  // Check if user already exists in storage to preserve credits
-  const existingUser = localStorage.getItem('chronofit_user');
-  const existingCredits = existingUser ? JSON.parse(existingUser).credits : 5; // Default 5 diamonds for new users
-  
-  return {
-    id: firebaseUser.uid,
-    name: firebaseUser.displayName || 'User',
-    email: firebaseUser.email || '',
-    provider: provider as 'google' | 'email',
-    credits: existingCredits,
-  };
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+
+const convertFirebaseUserToAppUser = async (firebaseUser: FirebaseUser, provider: string): Promise<User> => {
+  try {
+    // Register/sync user with backend database
+    const response = await fetch(`${API_URL}/api/users/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: firebaseUser.uid,
+        email: firebaseUser.email || '',
+        name: firebaseUser.displayName || 'User',
+        provider: provider
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to sync user with database');
+    }
+
+    const userData = await response.json();
+    
+    return {
+      id: userData.id,
+      name: userData.name,
+      email: userData.email,
+      provider: userData.provider as 'google' | 'email',
+      credits: userData.credits,
+    };
+  } catch (error) {
+    console.error('Error syncing user with database:', error);
+    // Fallback to basic user without credits from DB
+    return {
+      id: firebaseUser.uid,
+      name: firebaseUser.displayName || 'User',
+      email: firebaseUser.email || '',
+      provider: provider as 'google' | 'email',
+      credits: 0,
+    };
+  }
 };
 
 export const authService = {
@@ -72,7 +100,7 @@ export const authService = {
       // Update display name
       await updateProfile(result.user, { displayName });
       
-      const user = convertFirebaseUserToAppUser(result.user, 'email');
+      const user = await convertFirebaseUserToAppUser(result.user, 'email');
       return user;
     } catch (error: any) {
       console.error('Email registration error:', error);
@@ -93,7 +121,7 @@ export const authService = {
 
     try {
       const result = await signInWithEmailAndPassword(authInstance, email, password);
-      const user = convertFirebaseUserToAppUser(result.user, 'email');
+      const user = await convertFirebaseUserToAppUser(result.user, 'email');
       return user;
     } catch (error: any) {
       console.error('Email login error:', error);
@@ -118,7 +146,7 @@ export const authService = {
       provider.addScope('email');
 
       const result = await signInWithPopup(authInstance, provider);
-      const user = convertFirebaseUserToAppUser(result.user, 'google');
+      const user = await convertFirebaseUserToAppUser(result.user, 'google');
       return user;
     } catch (error: any) {
       console.error('Google login error:', error);
@@ -143,13 +171,13 @@ export const authService = {
     if (!authInstance) return null;
 
     return new Promise((resolve) => {
-      const unsubscribe = onAuthStateChanged(authInstance, (firebaseUser) => {
+      const unsubscribe = onAuthStateChanged(authInstance, async (firebaseUser) => {
         unsubscribe();
         if (firebaseUser) {
           // Determine provider from metadata
           const provider =
             firebaseUser.providerData?.[0]?.providerId?.split('.')?.[0] || 'google';
-          const user = convertFirebaseUserToAppUser(firebaseUser, provider);
+          const user = await convertFirebaseUserToAppUser(firebaseUser, provider);
           resolve(user);
         } else {
           resolve(null);
@@ -162,11 +190,11 @@ export const authService = {
     const { auth: authInstance } = initializeFirebase();
     if (!authInstance) return () => {};
 
-    return onAuthStateChanged(authInstance, (firebaseUser) => {
+    return onAuthStateChanged(authInstance, async (firebaseUser) => {
       if (firebaseUser) {
         const provider =
           firebaseUser.providerData?.[0]?.providerId?.split('.')?.[0] || 'google';
-        const user = convertFirebaseUserToAppUser(firebaseUser, provider);
+        const user = await convertFirebaseUserToAppUser(firebaseUser, provider);
         callback(user);
       } else {
         callback(null);

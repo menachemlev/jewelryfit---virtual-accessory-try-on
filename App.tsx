@@ -69,10 +69,14 @@ const App: React.FC = () => {
   // Initialize Data
   useEffect(() => {
     // Subscribe to Firebase auth state changes
-    const unsubscribe = authService.onAuthStateChanged((firebaseUser) => {
+    const unsubscribe = authService.onAuthStateChanged(async (firebaseUser) => {
       if (firebaseUser) {
         setUser(firebaseUser);
         storageService.setUser(firebaseUser);
+        // Fetch latest credits from database
+        await storageService.fetchCredits();
+        const updatedUser = storageService.getUser();
+        if (updatedUser) setUser(updatedUser);
       } else {
         setUser(null);
         storageService.setUser(null);
@@ -138,6 +142,11 @@ const App: React.FC = () => {
       
       setUser(newUser);
       storageService.setUser(newUser);
+      
+      // Fetch latest credits from database
+      await storageService.fetchCredits();
+      const updatedUser = storageService.getUser();
+      if (updatedUser) setUser(updatedUser);
     } catch (error) {
       console.error('Login error:', error);
       throw error;
@@ -184,8 +193,8 @@ const App: React.FC = () => {
     setPaymentModalOpen(true);
   };
 
-  const handlePurchase = (amount: number) => {
-    storageService.addCredits(amount);
+  const handlePurchase = async (amount: number) => {
+    await storageService.addCredits(amount);
     const updatedUser = storageService.getUser();
     setUser(updatedUser);
     setPaymentModalOpen(false);
@@ -367,7 +376,7 @@ const App: React.FC = () => {
       setStatus(ProcessingStatus.SUCCESS);
       
       // Deduct 1 credit
-      storageService.deductCredit(1);
+      await storageService.deductCredit(1);
       const updatedUser = storageService.getUser();
       if (updatedUser) setUser(updatedUser);
       

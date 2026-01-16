@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { GoogleGenAI, Type } from '@google/genai';
+import dbService from './database.js';
 
 dotenv.config();
 
@@ -45,6 +46,100 @@ const callWithRetry = async (fn, retries = 3, delay = 1000) => {
 };
 
 // ============ ENDPOINTS ============
+
+/**
+ * POST /api/users/register
+ * Create or get user and return with credits
+ */
+app.post('/api/users/register', async (req, res) => {
+  try {
+    const { userId, email, name, provider } = req.body;
+    
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+
+    const user = dbService.getOrCreateUser(userId, { email, name, provider });
+    res.json({ 
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      provider: user.provider,
+      credits: user.credits 
+    });
+  } catch (error) {
+    console.error('Error in users/register:', error);
+    res.status(500).json({ error: error.message || 'Failed to register user' });
+  }
+});
+
+/**
+ * GET /api/users/:userId/credits
+ * Get user's current credit balance
+ */
+app.get('/api/users/:userId/credits', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+
+    const credits = dbService.getUserCredits(userId);
+    res.json({ credits });
+  } catch (error) {
+    console.error('Error in get credits:', error);
+    res.status(500).json({ error: error.message || 'Failed to get credits' });
+  }
+});
+
+/**
+ * POST /api/users/:userId/credits/deduct
+ * Deduct credits from user
+ */
+app.post('/api/users/:userId/credits/deduct', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { amount = 1 } = req.body;
+    
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+
+    const success = dbService.deductCredits(userId, amount);
+    
+    if (!success) {
+      return res.status(402).json({ error: 'Insufficient credits' });
+    }
+
+    const newCredits = dbService.getUserCredits(userId);
+    res.json({ success: true, credits: newCredits });
+  } catch (error) {
+    console.error('Error in deduct credits:', error);
+    res.status(500).json({ error: error.message || 'Failed to deduct credits' });
+  }
+});
+
+/**
+ * POST /api/users/:userId/credits/add
+ * Add credits to user
+ */
+app.post('/api/users/:userId/credits/add', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { amount } = req.body;
+    
+    if (!userId || !amount) {
+      return res.status(400).json({ error: 'userId and amount are required' });
+    }
+
+    const newCredits = dbService.addCredits(userId, amount);
+    res.json({ success: true, credits: newCredits });
+  } catch (error) {
+    console.error('Error in add credits:', error);
+    res.status(500).json({ error: error.message || 'Failed to add credits' });
+  }
+});
 
 /**
  * POST /api/detect-accessory-type
