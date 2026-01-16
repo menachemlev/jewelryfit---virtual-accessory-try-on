@@ -47,7 +47,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, lang, setLang
           <div className="mb-4">
              <Logo className="w-24 h-24 text-yellow-500" />
           </div>
-          <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-yellow-500 to-yellow-700 dark:from-yellow-400 dark:to-yellow-600 mb-2 tracking-tighter">
+          <h1 style={{"line-height":"unset"}} className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-yellow-500 to-yellow-700 dark:from-yellow-400 dark:to-yellow-600 mb-2 tracking-tighter">
             {t.appTitle}
           </h1>
           <p className="text-gray-600 dark:text-gray-400">{t.subtitle}</p>

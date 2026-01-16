@@ -465,7 +465,7 @@ const App: React.FC = () => {
         <header className="mb-8 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <Logo className="w-10 h-10 text-yellow-600 dark:text-yellow-500" />
-            <h1 className="text-3xl md:text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-yellow-600 to-yellow-700 dark:from-yellow-400 dark:to-yellow-600 tracking-tight">
+            <h1 style={{"line-height":"unset"}} className="text-3xl md:text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-yellow-600 to-yellow-700 dark:from-yellow-400 dark:to-yellow-600 tracking-tight">
               {t.appTitle}
             </h1>
           </div>
