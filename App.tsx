@@ -4,12 +4,15 @@ import { LoginScreen } from './components/LoginScreen';
 import { HistorySidebar } from './components/HistorySidebar';
 import { ImageEditor } from './components/ImageEditor';
 import { TutorialModal } from './components/TutorialModal';
+import { PaymentModal } from './components/PaymentModal';
+import { FingerSelector } from './components/FingerSelector';
 import { Logo } from './components/Logo';
 import { generateTryOnImage, detectAccessoryType, validateImageSuitability } from './services/geminiService';
 import { storageService } from './services/storageService';
-import { authService } from './services/authService';
-import { ImageState, ProcessingStatus, AccessoryType, User, HistoryItem, Language } from './types';
+import { ImageState, ProcessingStatus, AccessoryType, User, HistoryItem, Language, Finger } from './types';
 import { translations } from './constants/translations';
+import { authService } from './services/authService';
+
 
 // Declare window interface for AI Studio wrapper
 declare global {
@@ -27,9 +30,11 @@ const App: React.FC = () => {
   const [baseImage, setBaseImage] = useState<ImageState>({ file: null, previewUrl: null, base64: null });
   const [accessoryImage, setAccessoryImage] = useState<ImageState>({ file: null, previewUrl: null, base64: null });
   const [resultImage, setResultImage] = useState<string | null>(null);
+  
   const [status, setStatus] = useState<ProcessingStatus>(ProcessingStatus.IDLE);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [accessoryType, setAccessoryType] = useState<AccessoryType>('WATCH');
+  const [selectedFinger, setSelectedFinger] = useState<Finger>('RING');
   const [isDetectingType, setIsDetectingType] = useState(false);
   const [hasKey, setHasKey] = useState<boolean>(false);
   const [showComparison, setShowComparison] = useState(false);
@@ -52,6 +57,9 @@ const App: React.FC = () => {
   // Tutorial State
   const [tutorialOpen, setTutorialOpen] = useState(false);
 
+  // Payment State
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  
   // Translations
   const t = translations[lang];
 
@@ -89,7 +97,6 @@ const App: React.FC = () => {
       }
     };
     checkKey();
-
     // Cleanup subscription
     return () => unsubscribe();
   }, []);
@@ -116,16 +123,12 @@ const App: React.FC = () => {
     setTheme(prev => prev === 'dark' ? 'light' : 'dark');
   };
 
-  const handleLogin = async (provider: 'google' | 'facebook' | 'apple') => {
+  const handleLogin = async (provider: 'google') => {
     try {
       let newUser: User;
       
       if (provider === 'google') {
         newUser = await authService.loginWithGoogle();
-      } else if (provider === 'facebook') {
-        newUser = await authService.loginWithFacebook();
-      } else if (provider === 'apple') {
-        newUser = await authService.loginWithApple();
       } else {
         throw new Error('Unknown provider');
       }
@@ -138,6 +141,32 @@ const App: React.FC = () => {
     }
   };
 
+  const handleLoginGoogle = async () => {
+    return handleLogin('google');
+  };
+
+  const handleLoginEmail = async (email: string, password: string) => {
+    try {
+      const newUser = await authService.loginWithEmail(email, password);
+      setUser(newUser);
+      storageService.setUser(newUser);
+    } catch (error) {
+      console.error('Email login error:', error);
+      throw error;
+    }
+  };
+
+  const handleRegisterEmail = async (email: string, password: string, displayName: string) => {
+    try {
+      const newUser = await authService.registerWithEmail(email, password, displayName);
+      setUser(newUser);
+      storageService.setUser(newUser);
+    } catch (error) {
+      console.error('Email registration error:', error);
+      throw error;
+    }
+  };
+
   const handleLogout = async () => {
     try {
       await authService.logout();
@@ -146,6 +175,17 @@ const App: React.FC = () => {
     } catch (error) {
       console.error('Logout error:', error);
     }
+  }
+
+  const handleOpenPayment = () => {
+    setPaymentModalOpen(true);
+  };
+
+  const handlePurchase = (amount: number) => {
+    storageService.addCredits(amount);
+    const updatedUser = storageService.getUser();
+    setUser(updatedUser);
+    setPaymentModalOpen(false);
   };
 
   const handleSelectKey = async () => {
@@ -170,7 +210,7 @@ const App: React.FC = () => {
       setBaseImage(prev => ({ ...prev, previewUrl: newBase64, base64: newBase64 }));
       // Re-validate on edit
       setBaseImageValidation({ status: 'analyzing' });
-      const analysis = await validateImageSuitability(newBase64, accessoryType, lang);
+      const analysis = await validateImageSuitability(newBase64, accessoryType, lang, t.photoSuitable, t.photoUnsuitable);
       setBaseImageValidation({
         status: analysis.suitable ? 'valid' : 'invalid',
         message: analysis.message
@@ -188,7 +228,7 @@ const App: React.FC = () => {
             // Trigger re-validation of base image against new type
             if (baseImage.base64) {
                 setBaseImageValidation({ status: 'analyzing' });
-                const analysis = await validateImageSuitability(baseImage.base64, type, lang);
+                const analysis = await validateImageSuitability(baseImage.base64, type, lang, t.photoSuitable, t.photoUnsuitable);
                 setBaseImageValidation({
                     status: analysis.suitable ? 'valid' : 'invalid',
                     message: analysis.message
@@ -215,7 +255,7 @@ const App: React.FC = () => {
     if (state.base64) {
       setBaseImageValidation({ status: 'analyzing' });
       try {
-        const analysis = await validateImageSuitability(state.base64, accessoryType, lang);
+        const analysis = await validateImageSuitability(state.base64, accessoryType, lang, t.photoSuitable, t.photoUnsuitable);
         setBaseImageValidation({
           status: analysis.suitable ? 'valid' : 'invalid',
           message: analysis.message
@@ -243,7 +283,7 @@ const App: React.FC = () => {
             // If we have a base image, re-validate it against the new type
             if (baseImage.base64) {
                 setBaseImageValidation({ status: 'analyzing' });
-                const analysis = await validateImageSuitability(baseImage.base64, type, lang);
+                const analysis = await validateImageSuitability(baseImage.base64, type, lang, t.photoSuitable, t.photoUnsuitable);
                 setBaseImageValidation({
                     status: analysis.suitable ? 'valid' : 'invalid',
                     message: analysis.message
@@ -283,6 +323,7 @@ const App: React.FC = () => {
     }
   };
 
+  // STANDARD PREVIEW (FREE)
   const handleGenerate = async () => {
     if (!baseImage.base64 || !accessoryImage.base64) {
       setErrorMsg(t.uploadBoth);
@@ -302,13 +343,19 @@ const App: React.FC = () => {
     setShowComparison(false);
 
     try {
-      const generatedImageBase64 = await generateTryOnImage(baseImage.base64, accessoryImage.base64, accessoryType);
+      // Use Standard generation
+      const generatedImageBase64 = await generateTryOnImage(
+        baseImage.base64, 
+        accessoryImage.base64, 
+        accessoryType,
+        accessoryType === 'RING' ? selectedFinger : undefined
+      );
       
       // Success
       setResultImage(generatedImageBase64);
       setStatus(ProcessingStatus.SUCCESS);
       
-      // Record Usage & History
+      // Record Usage & History (Standard)
       storageService.recordUsage();
       
       const newHistoryItem: HistoryItem = {
@@ -316,18 +363,18 @@ const App: React.FC = () => {
         timestamp: Date.now(),
         accessoryType,
         resultImage: generatedImageBase64,
-        accessoryImage: accessoryImage.base64 // Save accessory for comparison
+        accessoryImage: accessoryImage.base64,
+        isHD: false
       };
       
-      storageService.saveHistoryItem(newHistoryItem);
-      setHistoryItems(storageService.getHistory()); // Refresh list
+      await storageService.saveHistoryItem(newHistoryItem);
+      setHistoryItems(storageService.getHistory()); 
 
     } catch (e: any) {
       setStatus(ProcessingStatus.ERROR);
       const msg = e.message || "An unexpected error occurred.";
-      
-      // Improved error detection logic
-      const isRateLimit = 
+      // ... Error handling logic
+       const isRateLimit = 
         e.status === 429 || 
         e.code === 429 || 
         (e.message && (e.message.includes('429') || e.message.includes('Quota') || e.message.includes('RESOURCE_EXHAUSTED')));
@@ -340,6 +387,7 @@ const App: React.FC = () => {
       } else {
         setErrorMsg(msg);
       }
+      setErrorMsg(msg);
     }
   };
 
@@ -383,7 +431,7 @@ const App: React.FC = () => {
     if (baseImage.base64) {
         setBaseImageValidation({ status: 'analyzing' });
         try {
-            const analysis = await validateImageSuitability(baseImage.base64, type, lang);
+            const analysis = await validateImageSuitability(baseImage.base64, type, lang, t.photoSuitable, t.photoUnsuitable);
             setBaseImageValidation({
                 status: analysis.suitable ? 'valid' : 'invalid',
                 message: analysis.message
@@ -407,7 +455,13 @@ const App: React.FC = () => {
 
   // 1. Auth Gate
   if (!user) {
-    return <LoginScreen onLogin={handleLogin} lang={lang} setLang={setLang} />;
+    return <LoginScreen 
+      onLoginEmail={handleLoginEmail} 
+      onRegisterEmail={handleRegisterEmail}
+      onLoginGoogle={handleLoginGoogle}
+      lang={lang} 
+      setLang={setLang} 
+    />;
   }
 
   // 2. API Key Gate
@@ -440,6 +494,13 @@ const App: React.FC = () => {
         isOpen={tutorialOpen} 
         onClose={() => setTutorialOpen(false)} 
         initialType={accessoryType}
+        lang={lang}
+      />
+
+      <PaymentModal 
+        isOpen={paymentModalOpen} 
+        onClose={() => setPaymentModalOpen(false)} 
+        onPurchase={handlePurchase}
         lang={lang}
       />
       
@@ -508,7 +569,7 @@ const App: React.FC = () => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </button>
-
+            
             <button 
               onClick={handleLogout}
               className="text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white hover:underline decoration-yellow-500 underline-offset-4"
@@ -520,7 +581,6 @@ const App: React.FC = () => {
 
         {/* Main Content Grid */}
         <main className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
-          
           {/* Input Section */}
           <section className="bg-white/80 dark:bg-gray-800/50 backdrop-blur-sm rounded-2xl p-6 border border-gray-200 dark:border-gray-700 shadow-xl transition-colors duration-300">
              <div className="flex justify-between items-center mb-6">
@@ -537,7 +597,7 @@ const App: React.FC = () => {
              </div>
 
             {/* Accessory Type Selector */}
-            <div className="mb-8">
+            <div className="mb-4">
               <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 block">{t.accessoryType}</label>
               <div className="grid grid-cols-3 gap-2 bg-gray-100 dark:bg-gray-900/50 p-1 rounded-xl border border-gray-200 dark:border-gray-700">
                 {(['WATCH', 'BRACELET', 'RING'] as AccessoryType[]).map((type) => (
@@ -555,8 +615,17 @@ const App: React.FC = () => {
                 ))}
               </div>
             </div>
+
+            {/* Finger Selector (Conditional) */}
+            {accessoryType === 'RING' && (
+               <FingerSelector 
+                 selectedFinger={selectedFinger}
+                 onChange={setSelectedFinger}
+                 lang={lang}
+               />
+            )}
             
-            <div className="space-y-6">
+            <div className="space-y-6 mt-6">
               <div className="relative">
                  {/* Photo Guide Button */}
                 <button
@@ -596,9 +665,9 @@ const App: React.FC = () => {
 
             <button
               onClick={handleGenerate}
-              disabled={status === ProcessingStatus.PROCESSING || !baseImage.base64 || !accessoryImage.base64 || isDetectingType || baseImageValidation.status === 'analyzing'}
+              disabled={status === ProcessingStatus.PROCESSING || status === ProcessingStatus.UPSCALING || !baseImage.base64 || !accessoryImage.base64 || isDetectingType || baseImageValidation.status === 'analyzing'}
               className={`mt-8 w-full py-4 rounded-xl font-bold text-lg tracking-wide shadow-lg transition-all duration-300
-                ${status === ProcessingStatus.PROCESSING || isDetectingType || baseImageValidation.status === 'analyzing'
+                ${status === ProcessingStatus.PROCESSING || status === ProcessingStatus.UPSCALING || isDetectingType || baseImageValidation.status === 'analyzing'
                   ? 'bg-gray-300 dark:bg-gray-700 cursor-not-allowed text-gray-500 dark:text-gray-400' 
                   : 'bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-400 hover:to-yellow-500 text-black hover:shadow-yellow-500/20 transform hover:-translate-y-0.5 active:translate-y-0'
                 }`}
@@ -647,7 +716,7 @@ const App: React.FC = () => {
 
             <div className="flex-grow flex items-center justify-center bg-gray-100 dark:bg-gray-900/50 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 relative min-h-[400px]">
               {resultImage ? (
-                <div className="w-full h-full flex gap-1">
+                <div className="w-full h-full flex gap-1 relative">
                   {/* Comparison Side By Side */}
                   {showComparison && accessoryImage.previewUrl && (
                      <div className="flex-1 relative group bg-gray-200 dark:bg-gray-800 border-r border-gray-300 dark:border-gray-700">
@@ -666,10 +735,9 @@ const App: React.FC = () => {
                       alt="Generated Try-On" 
                       className="max-w-full max-h-[600px] object-contain"
                     />
-                    {showComparison && <span className="absolute top-2 left-2 bg-yellow-500/80 text-black text-[10px] font-bold px-2 py-1 rounded backdrop-blur-sm">Result</span>}
                     
-                    {/* Share/Download Buttons - Ensure correct placement for RTL if needed, but flex gap works */}
-                    <div className={`absolute top-4 ${lang === 'he' ? 'left-4' : 'right-4'} flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300`}>
+                    {/* Share/Download Buttons */}
+                    <div className={`absolute top-4 ${lang === 'he' ? 'left-4' : 'right-4'} flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20`}>
                       <button 
                         onClick={handleShare}
                         className="bg-white/90 dark:bg-black/70 hover:bg-white dark:hover:bg-black text-gray-900 dark:text-white p-2 rounded-lg backdrop-blur-md transition-colors border border-gray-200 dark:border-gray-700"

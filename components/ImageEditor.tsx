@@ -19,6 +19,8 @@ export const ImageEditor: React.FC<ImageEditorProps> = ({ imageSrc, onSave, onCa
   const [rotation, setRotation] = useState(0);
   const [brightness, setBrightness] = useState(100);
   const [contrast, setContrast] = useState(100);
+  const [saturation, setSaturation] = useState(100);
+  const [blur, setBlur] = useState(0);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
@@ -66,13 +68,13 @@ export const ImageEditor: React.FC<ImageEditorProps> = ({ imageSrc, onSave, onCa
     ctx.scale(scale, scale);
 
     // 5. Apply Filters
-    ctx.filter = `brightness(${brightness}%) contrast(${contrast}%)`;
+    ctx.filter = `brightness(${brightness}%) contrast(${contrast}%) saturate(${saturation}%) blur(${blur}px)`;
 
     // 6. Draw Image Centered
     ctx.drawImage(image, -image.width / 2, -image.height / 2);
 
     ctx.restore();
-  }, [image, scale, rotation, brightness, contrast, pan]);
+  }, [image, scale, rotation, brightness, contrast, saturation, blur, pan]);
 
   useEffect(() => {
     requestAnimationFrame(draw);
@@ -191,6 +193,37 @@ export const ImageEditor: React.FC<ImageEditorProps> = ({ imageSrc, onSave, onCa
                 max="200"
                 value={contrast}
                 onChange={(e) => setContrast(parseInt(e.target.value))}
+                className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-yellow-500"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex justify-between">
+                <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">{t.saturation}</label>
+                <span className="text-xs text-gray-400">{saturation}%</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="200"
+                value={saturation}
+                onChange={(e) => setSaturation(parseInt(e.target.value))}
+                className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-yellow-500"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex justify-between">
+                <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">{t.blur}</label>
+                <span className="text-xs text-gray-400">{blur}px</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="10"
+                step="0.5"
+                value={blur}
+                onChange={(e) => setBlur(parseFloat(e.target.value))}
                 className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-yellow-500"
               />
             </div>

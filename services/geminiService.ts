@@ -1,220 +1,255 @@
-import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
-import { AccessoryType, Language } from "../types";
+import { AccessoryType, Language, Finger } from "../types";
 
-const getGeminiClient = () => {
-  const apiKey = process.env.API_KEY;
-  if (!apiKey) {
-    throw new Error("API Key is missing in environment variables");
+// Server URL - can be configured via environment variable
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+
+// Helper function to call the server API
+const callServerAPI = async <T>(endpoint: string, payload: any): Promise<T> => {
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || `API error: ${response.status}`);
   }
-  return new GoogleGenAI({ apiKey });
+
+  return response.json() as Promise<T>;
 };
 
-// Helper for exponential backoff
-const callWithRetry = async <T>(fn: () => Promise<T>, retries = 3, delay = 1000): Promise<T> => {
-  try {
-    return await fn();
-  } catch (error: any) {
-    const isRateLimit = 
-      error.status === 429 || 
-      error.code === 429 || 
-      (error.message && (error.message.includes('429') || error.message.includes('Quota exceeded') || error.message.includes('RESOURCE_EXHAUSTED')));
+// --- IMAGE PROCESSING HELPERS ---
 
-    if (retries > 0 && isRateLimit) {
-      console.warn(`Rate limit hit. Retrying in ${delay}ms... (${retries} left)`);
-      await new Promise(resolve => setTimeout(resolve, delay));
-      return callWithRetry(fn, retries - 1, delay * 2);
-    }
-    throw error;
-  }
-};
-
-export const detectAccessoryType = async (imageBase64: string): Promise<AccessoryType> => {
-  const ai = getGeminiClient();
-  const cleanBase64 = imageBase64.replace(/^data:image\/(png|jpeg|jpg|webp);base64,/, "");
-
-  const prompt = "Analyze this image and classify the main jewelry/accessory item. Is it a WATCH, BRACELET, or RING? Return ONLY one of these words. If it is unclear, default to WATCH.";
-
-  try {
-    const response = await callWithRetry<GenerateContentResponse>(() => ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: {
-        parts: [
-          { text: prompt },
-          {
-            inlineData: {
-              mimeType: 'image/jpeg',
-              data: cleanBase64
-            }
-          }
-        ]
-      }
-    }));
-
-    const text = response.text?.toUpperCase() || '';
-    if (text.includes('RING')) return 'RING';
-    if (text.includes('BRACELET')) return 'BRACELET';
-    return 'WATCH';
-  } catch (error) {
-    console.warn("Auto-detection failed, defaulting to WATCH", error);
-    return 'WATCH';
-  }
-};
-
-export interface SuitabilityResult {
-  suitable: boolean;
-  message: string;
+interface ImageStats {
+  brightness: number; // 0-255 (Average Luminance)
+  warmth: number;     // Positive = Warm (Red dominant), Negative = Cool (Blue dominant)
+  contrast: number;   // Standard Deviation of brightness (0-128 approx)
 }
 
-export const validateImageSuitability = async (
-  imageBase64: string,
-  type: AccessoryType,
-  lang: Language
-): Promise<SuitabilityResult> => {
-  const ai = getGeminiClient();
-  const cleanBase64 = imageBase64.replace(/^data:image\/(png|jpeg|jpg|webp);base64,/, "");
-  const langName = lang === 'he' ? 'Hebrew' : 'English';
-
-  const prompt = `
-    Analyze this photo of a person's body part to see if it is suitable for virtually trying on a ${type}.
-    
-    Criteria:
-    1. For WATCH/BRACELET: The wrist/arm must be clearly visible and not covered by long sleeves.
-    2. For RING: The fingers must be visible, not blurred, and not forming a tight fist where a ring cannot be placed.
-    3. Lighting should be sufficient to see skin details.
-    
-    Return a JSON object with:
-    - suitable (boolean): true if good, false if bad.
-    - message (string): A very short (max 10 words) explanation for the user in ${langName}. e.g. "Sleeve is covering wrist", "Hand is too blurry", "Good photo".
-  `;
-
-  try {
-    const response = await callWithRetry<GenerateContentResponse>(() => ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: {
-        parts: [
-          { text: prompt },
-          {
-            inlineData: {
-              mimeType: 'image/jpeg',
-              data: cleanBase64
-            }
-          }
-        ]
-      },
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            suitable: { type: Type.BOOLEAN },
-            message: { type: Type.STRING }
-          }
-        }
+/**
+ * Analyzes the Base Image (Hand/Wrist) to understand the room's lighting conditions.
+ */
+const analyzeLightingConditions = (base64: string): Promise<ImageStats> => {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = "Anonymous";
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      // Downscale for performance - we only need average stats
+      canvas.width = 100;
+      canvas.height = 100;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        resolve({ brightness: 128, warmth: 0, contrast: 40 }); 
+        return;
       }
-    }));
 
-    const jsonStr = response.text || "{}";
-    const result = JSON.parse(jsonStr);
-    
-    return {
-      suitable: result.suitable ?? true,
-      message: result.message || (result.suitable ? "Good photo" : "Photo unclear")
+      ctx.drawImage(img, 0, 0, 100, 100);
+      const imageData = ctx.getImageData(0, 0, 100, 100);
+      const data = imageData.data;
+      
+      let totalLum = 0;
+      let totalR = 0;
+      let totalB = 0;
+      const luminances: number[] = [];
+
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+        
+        // Perceived Luminance (Human eye sensitivity)
+        const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+        totalLum += lum;
+        luminances.push(lum);
+        
+        totalR += r;
+        totalB += b;
+      }
+      
+      const pixelCount = data.length / 4;
+      const avgLum = totalLum / pixelCount;
+      const avgR = totalR / pixelCount;
+      const avgB = totalB / pixelCount;
+
+      // Calculate Contrast (Standard Deviation of Luminance)
+      const sumSqDiff = luminances.reduce((acc, val) => acc + Math.pow(val - avgLum, 2), 0);
+      const contrast = Math.sqrt(sumSqDiff / pixelCount);
+
+      resolve({
+        brightness: avgLum,
+        warmth: avgR - avgB,
+        contrast: contrast
+      });
     };
+    
+    img.onerror = () => resolve({ brightness: 128, warmth: 0, contrast: 40 });
+    img.src = base64;
+  });
+};
+
+/**
+ * Adjusts the Accessory Image to match the lighting of the Base Image.
+ * Applies Exposure, Contrast matching, Saturation adaptation, and Color Tinting.
+ */
+const preProcessAccessory = (base64: string, envStats: ImageStats): Promise<string> => {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = "Anonymous";
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        resolve(base64);
+        return;
+      }
+
+      ctx.drawImage(img, 0, 0);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imageData.data;
+
+      // --- CALCULATE ADJUSTMENT FACTORS ---
+
+      // 1. Brightness / Exposure
+      // Normalize room brightness around 128 (mid-gray).
+      // We clamp the ratio to avoid destroying the image in extreme conditions (pitch black/white room).
+      // Range: 0.6 (Darken) to 1.4 (Brighten)
+      const brightnessRatio = Math.max(0.6, Math.min(1.4, envStats.brightness / 120)); 
+
+      // 2. Contrast Matching
+      // Standard deviation of ~50 is a "balanced" image.
+      // < 30 is flat/foggy. > 70 is harsh/high-contrast.
+      // We adjust the accessory to match the room's "hardness" of light.
+      const contrastFactor = Math.max(0.7, Math.min(1.3, envStats.contrast / 50));
+
+      // 3. Adaptive Saturation
+      // Dark environments cause the human eye to perceive less color (Rod vs Cone cells).
+      // If brightness is low (< 60), we desaturate.
+      // If brightness is high, we ensure vibrancy.
+      let saturationFactor = 1.0;
+      if (envStats.brightness < 60) saturationFactor = 0.80;
+      else if (envStats.brightness > 180) saturationFactor = 1.1;
+
+      // 4. Color Temperature (Tint)
+      // `envStats.warmth` is (AvgRed - AvgBlue).
+      // If positive, room is warm (Incandescent/Golden Hour). If negative, room is cool (Shadow/Fluorescent).
+      // We apply ~40% of the room's bias to the accessory to integrate it.
+      const tintShift = envStats.warmth * 0.4;
+
+      // --- PIXEL PROCESSING LOOP ---
+      for (let i = 0; i < data.length; i += 4) {
+        // Skip fully transparent pixels
+        if (data[i + 3] === 0) continue;
+
+        let r = data[i];
+        let g = data[i + 1];
+        let b = data[i + 2];
+
+        // A. Apply Exposure (Brightness)
+        r *= brightnessRatio;
+        g *= brightnessRatio;
+        b *= brightnessRatio;
+
+        // B. Apply Contrast
+        // Formula: color = (color - 128) * factor + 128
+        r = (r - 128) * contrastFactor + 128;
+        g = (g - 128) * contrastFactor + 128;
+        b = (b - 128) * contrastFactor + 128;
+
+        // C. Apply Saturation (Grayscale Interpolation)
+        const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+        r = gray + (r - gray) * saturationFactor;
+        g = gray + (g - gray) * saturationFactor;
+        b = gray + (b - gray) * saturationFactor;
+
+        // D. Apply Tint (Warmth)
+        // Add to Red, Subtract from Blue (or vice versa)
+        r += tintShift;
+        b -= tintShift;
+
+        // Clamp values to 0-255
+        data[i] = Math.min(255, Math.max(0, r));
+        data[i + 1] = Math.min(255, Math.max(0, g));
+        data[i + 2] = Math.min(255, Math.max(0, b));
+      }
+
+      ctx.putImageData(imageData, 0, 0);
+      resolve(canvas.toDataURL());
+    };
+    
+    img.onerror = () => resolve(base64);
+    img.src = base64;
+  });
+};
+
+/**
+ * 1. Detect Accessory Type (Watch, Bracelet, Ring)
+ */
+export const detectAccessoryType = async (base64Image: string): Promise<AccessoryType> => {
+  try {
+    const result = await callServerAPI<{ accessoryType: AccessoryType }>(
+      '/api/detect-accessory-type',
+      { baseImage: base64Image }
+    );
+    return result.accessoryType;
   } catch (error) {
-    console.warn("Suitability check failed", error);
-    // Fail open (allow user to proceed) if check fails, but log it
-    return { suitable: true, message: "" };
+    console.warn("Detection failed, defaulting to WATCH", error);
+    return 'WATCH';
   }
 };
 
-export const generateTryOnImage = async (
-  baseImageBase64: string,
-  accessoryImageBase64: string,
-  type: AccessoryType
-): Promise<string> => {
-  const ai = getGeminiClient();
-
-  // Clean base64 strings if they contain metadata headers
-  const cleanBase = baseImageBase64.replace(/^data:image\/(png|jpeg|jpg|webp);base64,/, "");
-  const cleanAccessory = accessoryImageBase64.replace(/^data:image\/(png|jpeg|jpg|webp);base64,/, "");
-
-  let promptContext = "";
-  let placementInstruction = "";
-  let wrappingInstruction = "";
-
-  switch (type) {
-    case 'RING':
-      promptContext = "hand/fingers";
-      placementInstruction = "Position the ring naturally on a suitable finger (e.g., ring finger, index finger, or middle finger) of the hand.";
-      wrappingInstruction = "Ensure the ring wraps realistically around the finger, respecting the curvature and skin displacement.";
-      break;
-    case 'BRACELET':
-      promptContext = "wrist/arm";
-      placementInstruction = "Position the bracelet naturally around the wrist.";
-      wrappingInstruction = "Ensure the bracelet wraps realistically around the curvature of the wrist/arm, showing proper slack or fit.";
-      break;
-    case 'WATCH':
-    default:
-      promptContext = "wrist/arm";
-      placementInstruction = "Position the watch naturally on the wrist bone or slightly above, as people typically wear watches.";
-      wrappingInstruction = "If the watch strap is a metal bracelet or leather band, ensure it wraps realistically around the curvature of the arm.";
-      break;
-  }
-
-  const prompt = `
-    I have two images. 
-    The first image is a photo of a person's ${promptContext}. 
-    The second image is a product shot of a ${type.toLowerCase()}.
-    
-    Task: Create a highly realistic image where the ${type.toLowerCase()} from the second image is worn on the body part in the first image.
-    
-    Requirements:
-    1. ${placementInstruction}
-    2. Adjust the perspective and rotation of the ${type.toLowerCase()} to match the angle of the body part.
-    3. Generate realistic shadows cast by the item onto the skin.
-    4. Match the lighting of the item to the lighting environment of the photo.
-    5. ${wrappingInstruction}
-    6. Maintain high resolution and clarity for the product details.
-    7. Output ONLY the resulting image.
-  `;
-
+/**
+ * 2. Validate Image Suitability
+ */
+export const validateImageSuitability = async (
+  base64Image: string, 
+  type: AccessoryType, 
+  lang: Language,
+  validMsg: string,
+  invalidMsg: string
+): Promise<{ suitable: boolean; message?: string }> => {
   try {
-    const response = await callWithRetry<GenerateContentResponse>(() => ai.models.generateContent({
-      model: 'gemini-2.5-flash-image',
-      contents: {
-        parts: [
-          { text: prompt },
-          {
-            inlineData: {
-              mimeType: 'image/jpeg',
-              data: cleanBase
-            }
-          },
-          {
-            inlineData: {
-              mimeType: 'image/jpeg',
-              data: cleanAccessory
-            }
-          }
-        ]
-      }
-    }), 2, 2000);
-
-    // Check for inlineData (image) in response
-    const candidates = response.candidates;
-    if (candidates && candidates.length > 0) {
-      const parts = candidates[0].content.parts;
-      for (const part of parts) {
-        if (part.inlineData && part.inlineData.data) {
-          return `data:image/png;base64,${part.inlineData.data}`;
-        }
-      }
-    }
-    
-    throw new Error("No image data found in response");
-
+    const result = await callServerAPI<{ suitable: boolean; issue: string | null }>(
+      '/api/validate-image-suitability',
+      { baseImage: base64Image, type }
+    );
+    return {
+      suitable: result.suitable,
+      message: result.suitable ? validMsg : (result.issue || invalidMsg)
+    };
   } catch (error) {
-    console.error("Gemini API Error:", error);
+    console.warn("Validation failed, assuming valid", error);
+    return { suitable: true };
+  }
+};
+
+/**
+ * 3. Generate Try-On Image (Standard)
+ */
+export const generateTryOnImage = async (
+  baseImageBase64: string, 
+  accessoryImageBase64: string, 
+  type: AccessoryType,
+  finger: Finger = 'RING'
+): Promise<string> => {
+  try {
+    const result = await callServerAPI<{ image: string }>(
+      '/api/generate-try-on-image',
+      {
+        baseImage: baseImageBase64,
+        accessoryImage: accessoryImageBase64,
+        type,
+        finger
+      }
+    );
+    return result.image;
+  } catch (error) {
+    console.error("Try-on generation failed:", error);
     throw error;
   }
 };

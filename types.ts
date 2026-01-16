@@ -1,3 +1,4 @@
+
 export interface ImageState {
   file: File | null;
   previewUrl: string | null;
@@ -8,17 +9,21 @@ export enum ProcessingStatus {
   IDLE = 'IDLE',
   UPLOADING = 'UPLOADING',
   PROCESSING = 'PROCESSING',
+  UPSCALING = 'UPSCALING',
   SUCCESS = 'SUCCESS',
   ERROR = 'ERROR'
 }
 
 export type AccessoryType = 'WATCH' | 'BRACELET' | 'RING';
 
+export type Finger = 'THUMB' | 'INDEX' | 'MIDDLE' | 'RING' | 'PINKY';
+
 export interface User {
   id: string;
   name: string;
   email: string;
-  provider: 'google' | 'facebook' | 'apple';
+  provider: 'google' | 'email';
+  credits: number; // "Diamonds"
 }
 
 export interface HistoryItem {
@@ -26,7 +31,8 @@ export interface HistoryItem {
   timestamp: number;
   accessoryType: AccessoryType;
   resultImage: string;
-  accessoryImage: string; // Added to support comparison
+  accessoryImage: string;
+  isHD?: boolean;
 }
 
 export interface RateLimitState {

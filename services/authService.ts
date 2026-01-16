@@ -10,9 +10,10 @@ import {
   onAuthStateChanged,
   Unsubscribe,
   GoogleAuthProvider,
-  FacebookAuthProvider,
-  OAuthProvider,
   User as FirebaseUser,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  updateProfile,
 } from 'firebase/auth';
 import { User } from '../types';
 
@@ -50,11 +51,59 @@ const convertFirebaseUserToAppUser = (firebaseUser: FirebaseUser, provider: stri
     id: firebaseUser.uid,
     name: firebaseUser.displayName || 'User',
     email: firebaseUser.email || '',
-    provider: provider as 'google' | 'facebook' | 'apple',
+    provider: provider as 'google' | 'email',
+    credits: 0,
   };
 };
 
 export const authService = {
+  registerWithEmail: async (email: string, password: string, displayName: string): Promise<User> => {
+    const { auth: authInstance } = initializeFirebase();
+    if (!authInstance) throw new Error('Auth not initialized');
+
+    try {
+      // Create user account
+      const result = await createUserWithEmailAndPassword(authInstance, email, password);
+      
+      // Update display name
+      await updateProfile(result.user, { displayName });
+      
+      const user = convertFirebaseUserToAppUser(result.user, 'email');
+      return user;
+    } catch (error: any) {
+      console.error('Email registration error:', error);
+      if (error.code === 'auth/email-already-in-use') {
+        throw new Error('This email is already registered');
+      } else if (error.code === 'auth/weak-password') {
+        throw new Error('Password should be at least 6 characters');
+      } else if (error.code === 'auth/invalid-email') {
+        throw new Error('Invalid email address');
+      }
+      throw new Error(error.message || 'Registration failed');
+    }
+  },
+
+  loginWithEmail: async (email: string, password: string): Promise<User> => {
+    const { auth: authInstance } = initializeFirebase();
+    if (!authInstance) throw new Error('Auth not initialized');
+
+    try {
+      const result = await signInWithEmailAndPassword(authInstance, email, password);
+      const user = convertFirebaseUserToAppUser(result.user, 'email');
+      return user;
+    } catch (error: any) {
+      console.error('Email login error:', error);
+      if (error.code === 'auth/user-not-found') {
+        throw new Error('Email not found. Please register first.');
+      } else if (error.code === 'auth/wrong-password') {
+        throw new Error('Incorrect password');
+      } else if (error.code === 'auth/invalid-email') {
+        throw new Error('Invalid email address');
+      }
+      throw new Error(error.message || 'Login failed');
+    }
+  },
+
   loginWithGoogle: async (): Promise<User> => {
     const { auth: authInstance } = initializeFirebase();
     if (!authInstance) throw new Error('Auth not initialized');
@@ -70,42 +119,6 @@ export const authService = {
     } catch (error: any) {
       console.error('Google login error:', error);
       throw new Error(error.message || 'Google login failed');
-    }
-  },
-
-  loginWithFacebook: async (): Promise<User> => {
-    const { auth: authInstance } = initializeFirebase();
-    if (!authInstance) throw new Error('Auth not initialized');
-
-    try {
-      const provider = new FacebookAuthProvider();
-      provider.addScope('email');
-      provider.addScope('public_profile');
-
-      const result = await signInWithPopup(authInstance, provider);
-      const user = convertFirebaseUserToAppUser(result.user, 'facebook');
-      return user;
-    } catch (error: any) {
-      console.error('Facebook login error:', error);
-      throw new Error(error.message || 'Facebook login failed');
-    }
-  },
-
-  loginWithApple: async (): Promise<User> => {
-    const { auth: authInstance } = initializeFirebase();
-    if (!authInstance) throw new Error('Auth not initialized');
-
-    try {
-      const provider = new OAuthProvider('apple.com');
-      provider.addScope('email');
-      provider.addScope('name');
-
-      const result = await signInWithPopup(authInstance, provider);
-      const user = convertFirebaseUserToAppUser(result.user, 'apple');
-      return user;
-    } catch (error: any) {
-      console.error('Apple login error:', error);
-      throw new Error(error.message || 'Apple login failed');
     }
   },
 
