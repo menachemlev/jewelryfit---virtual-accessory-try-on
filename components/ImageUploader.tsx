@@ -72,7 +72,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({ label, imageState,
   }
 
   return (
-    <div className="flex flex-col gap-2 w-full">
+    <div className="flex flex-col gap-2 w-full mb-4">
       <label className="text-sm font-medium text-gray-600 dark:text-gray-300 uppercase tracking-wider flex justify-between">
         {label}
       </label>
