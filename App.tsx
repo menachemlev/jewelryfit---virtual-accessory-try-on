@@ -654,6 +654,8 @@ const App: React.FC = () => {
                    selectedSize={ringSize}
                    onChange={setRingSize}
                    lang={lang}
+                   handImage={baseImage.base64}
+                   fingerType={selectedFinger}
                  />
                </>
             )}
@@ -844,3 +846,4 @@ const App: React.FC = () => {
 };
 
 export default App;
+
