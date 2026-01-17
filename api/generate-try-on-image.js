@@ -95,29 +95,36 @@ export default async function handler(req, res) {
     // Use pro model for difficult fingers
     const useProModel = type === 'RING' && (finger !== 'RING');
     //const modelName = useProModel ? 'gemini-3-pro-image-preview' : 'gemini-2.5-flash-image';
-    const modelName = 'gemini-2.0-flash-exp';
+    const modelName = 'gemini-3-pro-image-preview';
 
     const response = await callWithRetry(async () => {
-      const model = ai.getGenerativeModel({ model: modelName });
-      return await model.generateContent([
-        prompt,
-        {
-          inlineData: {
-            mimeType: 'image/jpeg',
-            data: baseData
+      return await ai.generateContent({
+        model: modelName,
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              { text: prompt },
+              {
+                inlineData: {
+                  mimeType: 'image/jpeg',
+                  data: baseData
+                }
+              },
+              {
+                inlineData: {
+                  mimeType: 'image/jpeg',
+                  data: accData
+                }
+              }
+            ]
           }
-        },
-        {
-          inlineData: {
-            mimeType: 'image/jpeg',
-            data: accData
-          }
-        }
-      ]);
+        ]
+      });
     });
 
     // Find the image in the response
-    const candidates = response?.response?.candidates || [];
+    const candidates = response?.candidates || [];
     for (const candidate of candidates) {
       const parts = candidate?.content?.parts || [];
       for (const part of parts) {
