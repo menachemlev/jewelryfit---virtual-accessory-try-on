@@ -1,13 +1,13 @@
 import { GoogleGenAI } from '@google/genai';
-import { serverlessDbService } from './serverless-db.js';
-import { authenticateToken } from './users/_middleware.js';
+import {serverlessDbService} from './serverless-db.js';
+import { authenticateToken } from '../api/users/_middleware.js';
 
 const getGeminiClient = () => {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error('GEMINI_API_KEY is missing in environment variables');
   }
-  return new GoogleGenAI(apiKey);
+  return new GoogleGenAI({ apiKey });
 };
 
 const callWithRetry = async (fn, retries = 3, delay = 1000) => {
@@ -97,42 +97,28 @@ export default async function handler(req, res) {
     //const modelName = useProModel ? 'gemini-3-pro-image-preview' : 'gemini-2.5-flash-image';
     const modelName = 'gemini-3-pro-image-preview';
 
-    const response = await callWithRetry(async () => {
-      return await ai.generateContent({
-        model: modelName,
-        contents: [
-          {
-            role: 'user',
-            parts: [
-              { text: prompt },
-              {
-                inlineData: {
-                  mimeType: 'image/jpeg',
-                  data: baseData
-                }
-              },
-              {
-                inlineData: {
-                  mimeType: 'image/jpeg',
-                  data: accData
-                }
-              }
-            ]
-          }
+    const response = await callWithRetry(() => ai.models.generateContent({
+      model: modelName,
+      contents: {
+        parts: [
+          { text: prompt },
+          { inlineData: { mimeType: 'image/jpeg', data: baseData } },
+          { inlineData: { mimeType: 'image/jpeg', data: accData } }
         ]
-      });
-    });
+      },
+      config: {
+        imageConfig: {
+          aspectRatio: "1:1",
+        }
+      }
+    }));
 
     // Find the image in the response
-    const candidates = response?.candidates || [];
-    for (const candidate of candidates) {
-      const parts = candidate?.content?.parts || [];
-      for (const part of parts) {
-        if (part.inlineData && part.inlineData.data) {
-          return res.status(200).json({ 
-            image: `data:image/png;base64,${part.inlineData.data}` 
-          });
-        }
+    for (const part of response.candidates?.[0]?.content?.parts || []) {
+      if (part.inlineData && part.inlineData.data) {
+        return res.status(200).json({ 
+          image: `data:image/png;base64,${part.inlineData.data}` 
+        });
       }
     }
 
