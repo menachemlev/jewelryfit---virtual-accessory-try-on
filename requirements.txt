@@ -1,0 +1,29 @@
+# Python dependencies for Vercel serverless functions
+# Equivalent to the removed Node.js packages
+
+# Flask/FastAPI for HTTP routing (Express equivalent)
+flask==3.0.0
+flask-cors==4.0.0
+
+# JWT authentication (jsonwebtoken equivalent)
+PyJWT==2.8.0
+
+# Environment variables (dotenv equivalent)
+python-dotenv==1.0.0
+
+# Google AI (existing)
+google-generativeai==0.3.2
+google-cloud-aiplatform==1.38.0
+
+# Image processing
+Pillow==10.1.0
+opencv-python==4.8.1.78
+
+# AI models
+ultralytics==8.1.0
+
+# HTTP requests
+requests==2.31.0
+
+# Note: SQLite3 is built into Python, no need for better-sqlite3
+# Note: concurrently not needed - serverless functions run independently

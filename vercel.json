@@ -6,10 +6,6 @@
     { "source": "/api/(.*)", "destination": "/api/$1" }
   ],
   "functions": {
-    "api/**/*.js": {
-      "memory": 3008,
-      "maxDuration": 60
-    },
     "api/python/**/*.py": {
       "runtime": "python3.9",
       "memory": 3008,
