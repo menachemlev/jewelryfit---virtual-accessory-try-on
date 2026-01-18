@@ -4,60 +4,23 @@ import { Language } from '../types';
 import { translations } from '../constants/translations';
 
 interface LoginScreenProps {
-  onLoginEmail: (email: string, password: string) => Promise<void>;
-  onRegisterEmail: (email: string, password: string, displayName: string) => Promise<void>;
   onLoginGoogle: () => Promise<void>;
   lang: Language;
   setLang: (lang: Language) => void;
+  showCloseButton?: boolean;
+  onClose?: () => void;
 }
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({ 
-  onLoginEmail, 
-  onRegisterEmail, 
   onLoginGoogle,
   lang, 
-  setLang 
+  setLang,
+  showCloseButton = false,
+  onClose
 }) => {
   const t = translations[lang];
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isRegister, setIsRegister] = useState(false);
-  
-  // Form state
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [displayName, setDisplayName] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-
-  const handleEmailSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    setIsLoading(true);
-
-    try {
-      if (isRegister) {
-        if (!displayName.trim()) {
-          throw new Error(t.nameRequired);
-        }
-        if (password !== confirmPassword) {
-          throw new Error(t.passwordsDoNotMatch);
-        }
-        if (password.length < 6) {
-          throw new Error(t.passwordMinLength);
-        }
-        await onRegisterEmail(email, password, displayName);
-      } else {
-        await onLoginEmail(email, password);
-      }
-    } catch (err: any) {
-      setError(err.message || (isRegister ? t.registrationFailed : t.loginFailed));
-      console.error(`${isRegister ? 'Register' : 'Login'} error:`, err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const handleGoogleClick = async () => {
     setError(null);
@@ -108,6 +71,19 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       </div>
 
       <div className="max-w-md w-full bg-white/80 dark:bg-gray-800/60 backdrop-blur-xl p-8 rounded-3xl border border-gray-200 dark:border-gray-700 shadow-2xl z-10 transition-colors duration-300">
+        
+        {/* Close Button (for modal mode) */}
+        {showCloseButton && onClose && (
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
+
         <div className="text-center mb-10 flex flex-col items-center">
           <div className="mb-4">
              <Logo className="w-24 h-24 text-yellow-500" />
@@ -116,37 +92,50 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             {t.appTitle}
           </h1>
           <p className="text-gray-600 dark:text-gray-400">{t.subtitle}</p>
+          <p className="text-sm text-purple-600 dark:text-purple-400 mt-3 font-medium">
+            🎁 Sign in with Google to unlock premium features
+          </p>
         </div>
 
-        {/* Tab Switcher */}
-        <div className="flex gap-2 mb-6 p-1 bg-gray-100 dark:bg-gray-700 rounded-lg">
-          <button
-            onClick={() => {
-              setIsRegister(false);
-              setError(null);
-            }}
-            className={`flex-1 py-2 px-4 rounded-md font-medium transition-all ${
-              !isRegister 
-                ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm' 
-                : 'text-gray-600 dark:text-gray-300'
-            }`}
-          >
-            {t.login}
-          </button>
-          <button
-            onClick={() => {
-              setIsRegister(true);
-              setError(null);
-            }}
-            className={`flex-1 py-2 px-4 rounded-md font-medium transition-all ${
-              isRegister 
-                ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm' 
-                : 'text-gray-600 dark:text-gray-300'
-            }`}
-          >
-            {t.register}
-          </button>
-        </div>
+        {error && (
+          <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/30 border border-red-400 dark:border-red-700 rounded-lg text-red-700 dark:text-red-300 text-sm">
+            {error}
+          </div>
+        )}
+
+        {/* Google Login Button - Primary */}
+        <button
+          onClick={handleGoogleClick}
+          disabled={isLoading}
+          className="w-full flex items-center justify-center gap-3 bg-white text-gray-800 hover:bg-gray-50 disabled:bg-gray-100 disabled:cursor-not-allowed border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600 py-4 rounded-xl font-semibold transition-all transform active:scale-95 shadow-lg hover:shadow-xl"
+        >
+          {isLoading ? (
+            <>
+              <svg className="w-6 h-6 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" fill="none" opacity="0.25"></circle>
+                <path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <span>{t.loggingIn || 'Signing in...'}</span>
+            </>
+          ) : (
+            <>
+              <svg className="w-6 h-6" viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+              </svg>
+              <span>Continue with Google</span>
+            </>
+          )}
+        </button>
+
+        {/* Privacy Notice */}
+        <p className="mt-6 text-xs text-center text-gray-500 dark:text-gray-400">
+          By signing in, you agree to our Terms of Service and Privacy Policy. 
+          We only use Google to verify your identity - no spam, ever.
+        </p>
+      </div>
 
         {/* Email/Password Form */}
         <form onSubmit={handleEmailSubmit} className="space-y-4 mb-6">

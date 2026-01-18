@@ -92,6 +92,58 @@ export const storageService = {
         localStorage.removeItem(KEYS.USER);
       }
     },
+
+  // Free Trial Management
+  isGuestMode: (): boolean => {
+    return !storageService.getUser();
+  },
+
+  canUseFreeTrials: (): boolean => {
+    const user = storageService.getUser();
+    if (!user) {
+      // Guest mode: check localStorage for free tries
+      const freeTriesUsed = parseInt(localStorage.getItem('guestFreeTriesUsed') || '0');
+      return freeTriesUsed < 2;
+    }
+    return user.freeTriesUsed < 2;
+  },
+
+  incrementFreeTries: async (): Promise<void> => {
+    const user = storageService.getUser();
+    if (!user) {
+      // Guest mode
+      const current = parseInt(localStorage.getItem('guestFreeTriesUsed') || '0');
+      localStorage.setItem('guestFreeTriesUsed', String(current + 1));
+    } else {
+      // Update in backend
+      const token = authToken.get();
+      if (token) {
+        try {
+          await fetch(`${API_URL}/api/users/${user.id}/free-tries`, {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            }
+          });
+        } catch (error) {
+          console.error('Error incrementing free tries:', error);
+        }
+      }
+      user.freeTriesUsed += 1;
+      storageService.setUser(user);
+    }
+  },
+
+  getFreeTriesRemaining: (): number => {
+    const user = storageService.getUser();
+    if (!user) {
+      const used = parseInt(localStorage.getItem('guestFreeTriesUsed') || '0');
+      return Math.max(0, 2 - used);
+    }
+    return Math.max(0, 2 - user.freeTriesUsed);
+  },
+
   login: (provider: 'google' | 'facebook' | 'apple'): User => {
     // Check if user exists to preserve credits, otherwise create new
   
@@ -101,7 +153,9 @@ export const storageService = {
       name: `Demo User (${provider})`,
       email: `user@${provider}.com`,
       provider,
-      credits: 5 // Start with 5 free diamonds
+      credits: 5, // Start with 5 free diamonds
+      freeTriesUsed: 0, // Track free watermarked tries
+      isPremium: false
     };
     localStorage.setItem(KEYS.USER, JSON.stringify(user));
     return user;

@@ -9,6 +9,7 @@ import { FingerSelector } from './components/FingerSelector';
 import { RingSizeSelector } from './components/RingSizeSelector';
 import { Logo } from './components/Logo';
 import { JewelryReview } from './components/JewelryReview';
+import { BackendStatus } from './components/BackendStatus';
 import { generateTryOnImage, detectAccessoryType, validateImageSuitability } from './services/geminiService';
 import { storageService } from './services/storageService';
 import { ImageState, ProcessingStatus, AccessoryType, User, HistoryItem, Language, Finger, RingSize } from './types';
@@ -605,6 +606,9 @@ const App: React.FC = () => {
               <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
               <span className="text-xs font-medium text-gray-700 dark:text-gray-300">{user.name}</span>
             </div>
+
+            {/* Backend Status Indicator */}
+            <BackendStatus className="hidden lg:flex" />
 
             {/* Credits Display */}
             <button

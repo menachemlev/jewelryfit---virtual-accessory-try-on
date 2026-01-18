@@ -1,5 +1,6 @@
 import { AccessoryType, Language, Finger, RingSize } from "../types";
 import { authToken } from './authService';
+import { backendService } from './backendService';
 
 // Server URL - can be configured via environment variable
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
@@ -99,7 +100,7 @@ export const validateImageSuitability = async (
 };
 
 /**
- * 3. Generate Try-On Image (Standard)
+ * 3. Generate Try-On Image (Standard or Enhanced with Backend)
  */
 export const generateTryOnImage = async (
   baseImageBase64: string, 
@@ -109,6 +110,31 @@ export const generateTryOnImage = async (
   ringSize: RingSize = '58'
 ): Promise<string> => {
   try {
+    // Check if Cloud Run backend is available for enhanced processing
+    const config = backendService.getBackendConfig();
+    
+    if (config.hasFullPipeline && type === 'WATCH') {
+      // Use enhanced AI pipeline for watches
+      console.log('Using enhanced AI pipeline with Cloud Run backend');
+      
+      // Convert base64 to File
+      const baseFile = await base64ToFile(baseImageBase64, 'user_arm.jpg');
+      const watchFile = await base64ToFile(accessoryImageBase64, 'watch.jpg');
+      
+      const result = await backendService.processFullTryOn(baseFile, watchFile, true);
+      
+      if (result.success && result.output_url) {
+        // Fetch the image and convert back to base64 for consistency
+        const imageResponse = await fetch(result.output_url);
+        const blob = await imageResponse.blob();
+        return await blobToBase64(blob);
+      }
+      
+      // Fall back to standard processing if enhanced fails
+      console.warn('Enhanced processing failed, using standard method');
+    }
+    
+    // Use standard Vercel API processing
     const result = await callServerAPI<{ image: string }>(
       '/api/generate-try-on-image',
       {
@@ -125,3 +151,24 @@ export const generateTryOnImage = async (
     throw error;
   }
 };
+
+/**
+ * Helper: Convert base64 to File
+ */
+async function base64ToFile(base64: string, filename: string): Promise<File> {
+  const response = await fetch(base64);
+  const blob = await response.blob();
+  return new File([blob], filename, { type: blob.type });
+}
+
+/**
+ * Helper: Convert Blob to base64
+ */
+function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}

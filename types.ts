@@ -26,6 +26,22 @@ export interface User {
   email: string;
   provider: 'google' | 'email';
   credits: number; // "Diamonds"
+  freeTriesUsed: number; // Track free watermarked images (max 2)
+  isPremium: boolean;
+}
+
+export interface PricingTier {
+  id: string;
+  name: string;
+  price: number; // in ILS
+  credits: number;
+  description: string;
+  popular?: boolean;
+}
+
+export interface AIStyleCritique {
+  text: string;
+  isUnlocked: boolean;
 }
 
 export interface HistoryItem {

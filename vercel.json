@@ -7,8 +7,13 @@
   ],
   "functions": {
     "api/**/*.js": {
-      "memory": 1024,
+      "memory": 3008,
       "maxDuration": 60
+    },
+    "api/python/**/*.py": {
+      "runtime": "python3.9",
+      "memory": 3008,
+      "maxDuration": 300
     }
   }
 }

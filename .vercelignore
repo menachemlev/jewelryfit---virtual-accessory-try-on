@@ -1,0 +1,49 @@
+# Files not needed on Vercel
+
+# Python virtual environments
+venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Heavy AI models (too large for Vercel)
+*.pt
+*.pth
+*.onnx
+sam_*.pt
+
+# Test files
+test_*.py
+*_test.py
+pytest.ini
+
+# Temporary files
+uploads/
+outputs/
+temp/
+*.tmp
+
+# Development files
+.env.local
+.env.development
+
+# Git
+.git/
+.gitignore
+
+# Documentation (except essentials)
+IMPLEMENTATION_*.md
+AUTH_*.md
+SERVER_SETUP.md
+DATABASE_SETUP.md
+PAYPAL_SETUP.md
+OAUTH_SETUP.md
+SECURITY_IMPLEMENTATION.md
+
+# Keep these essential docs:
+# !README.md
+# !VERCEL_DEPLOYMENT.md
+# !VERCEL_QUICKSTART.md
