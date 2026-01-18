@@ -170,7 +170,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             {t.terms}
           </p>
         </div>
-      </div>
     </div>
   );
 };
