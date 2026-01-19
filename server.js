@@ -2,8 +2,12 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import jwt from 'jsonwebtoken';
+import rateLimit from 'express-rate-limit';
 import { GoogleGenAI, Type } from '@google/genai';
 import dbService from './database.js';
+import imageProcessingService from './services/imageProcessingService.js';
+import geminiAIService from './services/geminiAIService.js';
+import cacheService from './services/cacheService.js';
 
 dotenv.config();
 
@@ -18,12 +22,54 @@ app.use(cors({
   credentials: true
 }));
 
+// ============ RATE LIMITING ============
+// Guest users: 10 requests per 1 minute
+const guestRateLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 10,
+  message: { error: 'Too many requests from this IP. Please wait a moment or log in.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => {
+    // Skip rate limiting for authenticated users
+    const authHeader = req.headers['authorization'];
+    return authHeader && authHeader.startsWith('Bearer ');
+  }
+});
+
+// Authenticated users: 50 requests per 1 minute
+const authRateLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 50,
+  message: { error: 'Too many requests. Please slow down.' },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
 // JWT Token Generation
 const generateToken = (userId) => {
   return jwt.sign({ userId }, JWT_SECRET, { expiresIn: '7d' });
 };
 
-// Auth Middleware
+// Auth Middleware (optional - doesn't block if no token)
+const optionalAuth = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (token) {
+    jwt.verify(token, JWT_SECRET, (err, decoded) => {
+      if (!err) {
+        req.userId = decoded.userId;
+        req.isAuthenticated = true;
+      }
+    });
+  }
+  
+  req.isAuthenticated = req.isAuthenticated || false;
+  next();
+};
+
+// Auth Middleware (required)
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
@@ -37,6 +83,7 @@ const authenticateToken = (req, res, next) => {
       return res.status(403).json({ error: 'Invalid or expired token' });
     }
     req.userId = decoded.userId;
+    req.isAuthenticated = true;
     next();
   });
 };
@@ -342,6 +389,189 @@ app.post('/api/generate-try-on-image', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Error in generate-try-on-image:', error);
     res.status(500).json({ error: error.message || 'Failed to generate try-on image' });
+  }
+});
+
+/**
+ * POST /api/try-on
+ * NEW UNIFIED PIPELINE: Gemini Direct Try-On with Server-Side Watermarking
+ * - Supports guest users (watermarked results)
+ * - Supports authenticated users (can unlock later)
+ * - Optimizes images, processes with Gemini, returns watermarked result
+ */
+app.post('/api/try-on', guestRateLimiter, optionalAuth, async (req, res) => {
+  try {
+    const { baseImage, accessoryImage, accessoryType, finger, ringSize } = req.body;
+    
+    // Validation
+    if (!baseImage || !accessoryImage) {
+      return res.status(400).json({ error: 'baseImage and accessoryImage are required' });
+    }
+
+    console.log(`Try-on request: ${accessoryType || 'AUTO'} | Auth: ${req.isAuthenticated} | User: ${req.userId || 'guest'}`);
+
+    // Step 1: Validate images
+    const [baseValidation, accessoryValidation] = await Promise.all([
+      imageProcessingService.validateImage(baseImage),
+      imageProcessingService.validateImage(accessoryImage)
+    ]);
+
+    if (!baseValidation.valid) {
+      return res.status(400).json({ error: `Base image invalid: ${baseValidation.reason}` });
+    }
+
+    if (!accessoryValidation.valid) {
+      return res.status(400).json({ error: `Accessory image invalid: ${accessoryValidation.reason}` });
+    }
+
+    // Step 2: Detect accessory type if not provided
+    let detectedType = accessoryType;
+    if (!detectedType) {
+      console.log('Detecting accessory type...');
+      detectedType = await geminiAIService.detectAccessoryType(accessoryImage);
+      console.log(`Detected: ${detectedType}`);
+    }
+
+    // Step 3: Generate clean try-on image using Gemini
+    const tryOnResult = await geminiAIService.generateTryOnImage(
+      baseImage,
+      accessoryImage,
+      {
+        accessoryType: detectedType,
+        finger: finger || 'RING',
+        ringSize: ringSize
+      }
+    );
+
+    const { cleanBuffer, cleanBase64 } = tryOnResult;
+
+    // Step 4: Determine if user needs watermark
+    const needsWatermark = !req.isAuthenticated || !req.userId;
+    
+    let responseImage;
+    let requestId = null;
+
+    if (needsWatermark) {
+      // Guest user or not authenticated: Apply watermark
+      console.log('Applying watermark for guest/free user...');
+      const watermarked = await imageProcessingService.applyWatermark(cleanBuffer, {
+        pattern: 'diagonal',
+        text: 'JewelryFit',
+        opacity: 0.25
+      });
+
+      // Store clean version temporarily for potential purchase
+      requestId = cacheService.storeCleanImage(cleanBuffer, {
+        userId: req.userId || 'guest',
+        accessoryType: detectedType,
+        timestamp: Date.now()
+      });
+
+      responseImage = `data:image/jpeg;base64,${watermarked.base64}`;
+    } else {
+      // Authenticated user: Still return watermarked but cache clean for unlock
+      console.log('Applying watermark but caching clean version for authenticated user...');
+      const watermarked = await imageProcessingService.applyWatermark(cleanBuffer, {
+        pattern: 'diagonal',
+        text: 'JewelryFit - Preview',
+        opacity: 0.2
+      });
+
+      requestId = cacheService.storeCleanImage(cleanBuffer, {
+        userId: req.userId,
+        accessoryType: detectedType,
+        timestamp: Date.now()
+      });
+
+      responseImage = `data:image/jpeg;base64,${watermarked.base64}`;
+    }
+
+    res.json({
+      image: responseImage,
+      accessoryType: detectedType,
+      requestId, // Return for unlock later
+      watermarked: true,
+      message: req.isAuthenticated 
+        ? 'Preview ready. Use requestId to unlock clean version.'
+        : 'Preview ready. Log in to remove watermark.'
+    });
+
+  } catch (error) {
+    console.error('Error in /api/try-on:', error);
+    res.status(500).json({ error: error.message || 'Try-on failed' });
+  }
+});
+
+/**
+ * POST /api/unlock-image
+ * Unlock a clean image (requires authentication and payment/credits)
+ */
+app.post('/api/unlock-image', authenticateToken, async (req, res) => {
+  try {
+    const { requestId } = req.body;
+
+    if (!requestId) {
+      return res.status(400).json({ error: 'requestId is required' });
+    }
+
+    console.log(`Unlock request: ${requestId} | User: ${req.userId}`);
+
+    // Check if request exists
+    const cached = cacheService.retrieveCleanImage(requestId);
+    
+    if (!cached) {
+      return res.status(404).json({ 
+        error: 'Image not found or expired. Please generate a new try-on.' 
+      });
+    }
+
+    // Verify ownership (optional - can allow any authenticated user)
+    if (cached.metadata.userId !== req.userId && cached.metadata.userId !== 'guest') {
+      return res.status(403).json({ error: 'Unauthorized access to this image' });
+    }
+
+    // Check user credits (1 credit per unlock)
+    const hasCredits = dbService.deductCredits(req.userId, 1);
+    
+    if (!hasCredits) {
+      // Restore the image to cache since payment failed
+      const restoredRequestId = cacheService.storeCleanImage(cached.buffer, cached.metadata);
+      
+      return res.status(402).json({ 
+        error: 'Insufficient credits',
+        requestId: restoredRequestId // Allow them to try again
+      });
+    }
+
+    // Success: Return clean image
+    const newCredits = dbService.getUserCredits(req.userId);
+    const cleanBase64 = cached.buffer.toString('base64');
+
+    console.log(`Unlocked successfully. Remaining credits: ${newCredits}`);
+
+    res.json({
+      image: `data:image/jpeg;base64,${cleanBase64}`,
+      credits: newCredits,
+      message: 'Image unlocked successfully'
+    });
+
+  } catch (error) {
+    console.error('Error in /api/unlock-image:', error);
+    res.status(500).json({ error: error.message || 'Unlock failed' });
+  }
+});
+
+/**
+ * GET /api/cache/stats
+ * Get cache statistics (admin/debug endpoint)
+ */
+app.get('/api/cache/stats', authenticateToken, (req, res) => {
+  try {
+    const stats = cacheService.getStats();
+    res.json(stats);
+  } catch (error) {
+    console.error('Error getting cache stats:', error);
+    res.status(500).json({ error: 'Failed to get cache stats' });
   }
 });
 
