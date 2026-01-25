@@ -84,7 +84,7 @@ class GeminiAIService {
 
       const response = await this.callWithRetry(() => 
         ai.models.generateContent({
-          model: this.model,
+          model: 'gemini-3-pro-image-preview',
           contents: {
             parts: [
               { 
@@ -133,43 +133,53 @@ class GeminiAIService {
    * @private
    */
   buildTryOnPrompt(accessoryType, details) {
-    const basePrompt = `Act as a professional photo retoucher and jewelry specialist.
+    const basePrompt = `Act as an expert photorealistic compositor and jewelry photographer.
 
-Your task: Seamlessly fuse the jewelry from the second image onto the appropriate location in the first image.
+Your task: Create a photorealistic composite where the jewelry from the second image appears to be physically worn on the body part in the first image.
 
-Requirements:
-1. POSITIONING: Place the ${accessoryType.toLowerCase()} naturally and accurately on the ${this.getBodyPartName(accessoryType)}
-2. LIGHTING: Match the lighting, shadows, and highlights exactly to the first image's environment
-3. PERSPECTIVE: Adjust the jewelry's angle and perspective to match the body part's orientation
-4. REALISM: Ensure the jewelry looks like it's actually being worn - add subtle shadows under/around it
-5. SEAMLESS BLEND: No visible edges, perfect integration with skin tone and texture
-6. QUALITY: Maintain high resolution and professional quality
+CRITICAL - Achieve Maximum Realism:
+1. NATURAL INTEGRATION: The jewelry must look three-dimensional and physically present, NOT flat or overlaid
+2. DEPTH & SHADOWS: Add realistic shadows cast BY the jewelry onto the skin, and subtle shadows ON the jewelry from surrounding light sources
+3. LIGHTING COHERENCE: Match ALL lighting characteristics - direction, color temperature, intensity, and reflections from the first image
+4. PERSPECTIVE & DISTORTION: Apply natural perspective distortion based on the body part's angle and camera position
+5. SURFACE INTERACTION: Show natural contact points between jewelry and skin - slight compression, skin texture changes, subtle indentations
+6. MATERIAL PHYSICS: Ensure metal reflects light naturally, gemstones refract light appropriately, and all materials behave realistically
+7. SEAMLESS EDGES: Blend edges perfectly with anti-aliasing, soft transitions, and natural skin texture continuation
+8. COLOR HARMONY: Adjust jewelry colors to match the color grading and white balance of the original photo
+9. MICRO-DETAILS: Preserve skin pores, fine lines, and texture around and underneath the jewelry
+10. PHOTO-QUALITY: The result must be indistinguishable from a professional photograph taken with the jewelry actually worn
 `;
 
     // Add specific instructions based on accessory type
     let specificInstructions = '';
     
     if (accessoryType === 'RING' && details.finger) {
-      specificInstructions = `\nSpecific details:
-- Place the ring on the ${details.finger.toLowerCase()} finger
-- Position it at the natural ring-wearing location (between first and second knuckle)
-- Ensure the ring's size appears proportional${details.ringSize ? ` (target size: ${details.ringSize})` : ''}
-- Account for finger curvature and perspective`;
+      specificInstructions = `\nRing-Specific Requirements:
+- Position: Natural ring location on the ${details.finger.toLowerCase()} finger (between first and second knuckle)
+- Proportions: Ring size must look anatomically correct${details.ringSize ? ` (approximate size: ${details.ringSize})` : ''}
+- Curvature: Follow the natural cylindrical curve of the finger - the ring should wrap around completely
+- Depth: Show the ring's thickness and how it sits slightly above the skin surface
+- Shadows: Cast ring shadow onto finger, show shadowing inside the band
+- Interaction: Slight skin pressure marks where band contacts finger, natural skin gathering if ring is snug`;
     } else if (accessoryType === 'WATCH') {
-      specificInstructions = `\nSpecific details:
-- Position the watch on the wrist naturally, slightly above the wrist bone
-- Ensure the watch face is clearly visible and properly oriented
-- Make it appear as if the band wraps around the wrist
-- Add subtle shadows beneath the watch and band`;
+      specificInstructions = `\nWatch-Specific Requirements:
+- Position: Natural placement on wrist, slightly above the wrist bone
+- Orientation: Watch face properly aligned and clearly visible
+- Band Integration: Band must curve and wrap realistically around the entire wrist circumference
+- Depth & Shadows: Watch case casts shadow on wrist, band creates subtle shadow trail
+- Skin Contact: Show how the band sits on wrist - slight skin compression, realistic strap tension
+- Reflections: Watch crystal/glass reflects ambient light naturally`;
     } else if (accessoryType === 'BRACELET') {
-      specificInstructions = `\nSpecific details:
-- Position the bracelet naturally on the wrist
-- Ensure it drapes or sits realistically based on the bracelet style
-- Account for the wrist's curvature and natural pose
-- Add appropriate shadows and highlights`;
+      specificInstructions = `\nBracelet-Specific Requirements:
+- Position: Natural placement on wrist with realistic draping based on bracelet weight and style
+- Curvature: Follow the wrist's natural cylindrical contour completely
+- Movement: If the bracelet is loose, show natural gaps between bracelet and skin
+- Depth: Show bracelet thickness and how it sits in relation to the skin surface
+- Shadows: Cast shadows on wrist, show internal shadowing in links or gaps
+- Physics: Respect gravity and natural hang of the bracelet material`;
     }
 
-    return basePrompt + specificInstructions + `\n\nReturn ONLY the final composite image with the jewelry seamlessly integrated.`;
+    return basePrompt + specificInstructions + `\n\nIMPORTANT: The final result must look like a single photograph taken with a real camera where the person is actually wearing the jewelry. NO flat overlay effects, NO digital sticker appearance. Every detail must contribute to photorealistic authenticity.\n\nReturn ONLY the final photorealistic composite image.`;
   }
 
   /**
@@ -243,9 +253,11 @@ Requirements:
 Accessory Type: ${accessoryType}
 
 Evaluate:
-1. Size appropriateness (does it look natural and proportional?)
-2. Position accuracy (is it placed correctly?)
-3. Overall realism (does it look like a real photo?)
+1. Size appropriateness (is the jewelry proportional to the body part?)
+2. Position accuracy (is it correctly placed on the body part?)
+3. Overall quality (does the integration look natural and believable?)
+
+Provide constructive feedback focused on sizing, positioning, and fit. Do NOT comment on rendering techniques or image composition methods.
 
 Respond in JSON format:
 {
