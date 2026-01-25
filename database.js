@@ -175,6 +175,36 @@ export const dbService = {
   },
 
   /**
+   * Reset database (DEVELOPMENT ONLY)
+   * Drops and recreates all tables
+   */
+  resetDatabase: () => {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('Cannot reset database in production');
+    }
+    
+    try {
+      db.exec('DROP TABLE IF EXISTS users');
+      db.exec(`
+        CREATE TABLE users (
+          id TEXT PRIMARY KEY,
+          email TEXT UNIQUE,
+          name TEXT,
+          provider TEXT,
+          credits INTEGER DEFAULT 2,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX idx_users_email ON users(email);
+      `);
+      console.log('Database reset successfully');
+    } catch (error) {
+      console.error('Error resetting database:', error);
+      throw error;
+    }
+  },
+
+  /**
    * Close database connection
    */
   close: () => {
