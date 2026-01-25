@@ -15,7 +15,7 @@ db.exec(`
     email TEXT UNIQUE,
     name TEXT,
     provider TEXT,
-    credits INTEGER DEFAULT 5,
+    credits INTEGER DEFAULT 2,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
