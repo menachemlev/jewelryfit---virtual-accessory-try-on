@@ -94,6 +94,21 @@ export const serverlessDbService = {
    */
   getUser: (userId) => {
     return users.get(userId) || null;
+  },
+
+  /**
+   * Get all users (for admin purposes)
+   */
+  getAllUsers: () => {
+    return users;
+  },
+
+  /**
+   * Reset database (clear all users)
+   */
+  resetDatabase: () => {
+    users.clear();
+    return true;
   }
 };
 

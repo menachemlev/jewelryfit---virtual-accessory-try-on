@@ -1,8 +1,11 @@
-import dbService from '../database.js';
+import { serverlessDbService } from './serverless-db.js';
 
 /**
  * Reset Database (Development Only)
  * WARNING: This will delete ALL user data
+ * 
+ * Note: In Vercel, this resets the in-memory database.
+ * The database is automatically reset on each deployment anyway.
  */
 export default async function handler(req, res) {
   // Only allow in development
@@ -28,12 +31,17 @@ export default async function handler(req, res) {
       });
     }
 
-    // Reset the database
-    dbService.resetDatabase();
+    // Reset the in-memory database (clear all users)
+    // Note: This only affects the current serverless function instance
+    const usersMap = serverlessDbService.getAllUsers ? 
+      serverlessDbService.getAllUsers() : new Map();
+    
+    usersMap.clear();
 
     res.status(200).json({ 
       success: true, 
-      message: 'Database reset successfully. All user data has been deleted.' 
+      message: 'Database reset successfully. All user data has been cleared from this instance.',
+      note: 'In Vercel serverless environment, each function instance has its own memory. The database resets automatically on deployment.'
     });
   } catch (error) {
     console.error('Error resetting database:', error);
