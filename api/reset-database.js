@@ -32,11 +32,17 @@ export default async function handler(req, res) {
     }
 
     // Reset the in-memory database (clear all users)
+    // Prefer service-provided reset method when available
     // Note: This only affects the current serverless function instance
-    const usersMap = serverlessDbService.getAllUsers ? 
-      serverlessDbService.getAllUsers() : new Map();
-    
-    usersMap.clear();
+    if (typeof serverlessDbService.resetDatabase === 'function') {
+      // Some implementations may be async
+      await serverlessDbService.resetDatabase();
+    } else if (typeof serverlessDbService.getAllUsers === 'function') {
+      const usersMap = serverlessDbService.getAllUsers();
+      if (usersMap && typeof usersMap.clear === 'function') {
+        usersMap.clear();
+      }
+    }
 
     res.status(200).json({ 
       success: true, 

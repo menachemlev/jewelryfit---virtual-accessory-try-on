@@ -101,7 +101,7 @@ export const storageService = {
       name: `Demo User (${provider})`,
       email: `user@${provider}.com`,
       provider,
-      credits: 5 // Start with 5 free diamonds
+      credits: 2 // Start with 2 free diamonds
     };
     localStorage.setItem(KEYS.USER, JSON.stringify(user));
     return user;

@@ -18,7 +18,7 @@ export const serverlessDbService = {
           email: userData.email || '',
           name: userData.name || 'User',
           provider: userData.provider || 'google',
-          credits: 5,
+          credits: 2,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         };

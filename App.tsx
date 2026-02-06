@@ -6,12 +6,11 @@ import { ImageEditor } from './components/ImageEditor';
 import { TutorialModal } from './components/TutorialModal';
 import { PaymentModal } from './components/PaymentModal';
 import { FingerSelector } from './components/FingerSelector';
-import { RingSizeSelector } from './components/RingSizeSelector';
 import { Logo } from './components/Logo';
 import { JewelryReview } from './components/JewelryReview';
 import { generateTryOnImage, detectAccessoryType, validateImageSuitability } from './services/geminiService';
 import { storageService } from './services/storageService';
-import { ImageState, ProcessingStatus, AccessoryType, User, HistoryItem, Language, Finger, RingSize } from './types';
+import { ImageState, ProcessingStatus, AccessoryType, User, HistoryItem, Language, Finger } from './types';
 import { translations } from './constants/translations';
 import { authService } from './services/authService';
 
@@ -37,7 +36,6 @@ const App: React.FC = () => {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [accessoryType, setAccessoryType] = useState<AccessoryType>('WATCH');
   const [selectedFinger, setSelectedFinger] = useState<Finger>('RING');
-  const [ringSize, setRingSize] = useState<RingSize>('58');
   const [isDetectingType, setIsDetectingType] = useState(false);
   const [hasKey, setHasKey] = useState<boolean>(false);
   const [showComparison, setShowComparison] = useState(false);
@@ -364,11 +362,10 @@ const App: React.FC = () => {
     try {
       // Use Standard generation
       const generatedImageBase64 = await generateTryOnImage(
-        baseImage.base64, 
-        accessoryImage.base64, 
+        baseImage.base64,
+        accessoryImage.base64,
         accessoryType,
-        accessoryType === 'RING' ? selectedFinger : undefined,
-        accessoryType === 'RING' ? ringSize : undefined
+        accessoryType === 'RING' ? selectedFinger : undefined
       );
       
       // Success - result generated successfully
@@ -711,20 +708,11 @@ const App: React.FC = () => {
 
             {/* Finger Selector (Conditional) */}
             {accessoryType === 'RING' && (
-               <>
-                 <FingerSelector 
-                   selectedFinger={selectedFinger}
-                   onChange={setSelectedFinger}
-                   lang={lang}
-                 />
-                 <RingSizeSelector 
-                   selectedSize={ringSize}
-                   onChange={setRingSize}
-                   lang={lang}
-                   handImage={baseImage.base64}
-                   fingerType={selectedFinger}
-                 />
-               </>
+               <FingerSelector 
+                 selectedFinger={selectedFinger}
+                 onChange={setSelectedFinger}
+                 lang={lang}
+               />
             )}
 
             {errorMsg && (
