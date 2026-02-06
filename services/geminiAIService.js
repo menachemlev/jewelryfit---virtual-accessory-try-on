@@ -270,7 +270,7 @@ Respond in JSON format:
 
       const response = await this.callWithRetry(() =>
         ai.models.generateContent({
-          model: 'gemini-1.5-flash',
+          model: 'gemini-3-pro-image-preview',
           contents: {
             parts: [
               { inlineData: { mimeType: optimized.mimeType, data: optimized.base64 } },
