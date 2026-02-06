@@ -133,53 +133,133 @@ class GeminiAIService {
    * @private
    */
   buildTryOnPrompt(accessoryType, details) {
-    const basePrompt = `Act as an expert photorealistic compositor and jewelry photographer.
+    const basePrompt = `You are a master photorealistic image compositor specializing in jewelry photography. Your goal is to seamlessly place jewelry onto a body part so it appears IDENTICAL to a real photograph.
 
-Your task: Create a photorealistic composite where the jewelry from the second image appears to be physically worn on the body part in the first image.
+CORE TASK: Merge the jewelry from image 2 onto the body part in image 1, creating a single authentic photograph where the jewelry is genuinely worn.
 
-CRITICAL - Achieve Maximum Realism:
-1. NATURAL INTEGRATION: The jewelry must look three-dimensional and physically present, NOT flat or overlaid
-2. DEPTH & SHADOWS: Add realistic shadows cast BY the jewelry onto the skin, and subtle shadows ON the jewelry from surrounding light sources
-3. LIGHTING COHERENCE: Match ALL lighting characteristics - direction, color temperature, intensity, and reflections from the first image
-4. PERSPECTIVE & DISTORTION: Apply natural perspective distortion based on the body part's angle and camera position
-5. SURFACE INTERACTION: Show natural contact points between jewelry and skin - slight compression, skin texture changes, subtle indentations
-6. MATERIAL PHYSICS: Ensure metal reflects light naturally, gemstones refract light appropriately, and all materials behave realistically
-7. SEAMLESS EDGES: Blend edges perfectly with anti-aliasing, soft transitions, and natural skin texture continuation
-8. COLOR HARMONY: Adjust jewelry colors to match the color grading and white balance of the original photo
-9. MICRO-DETAILS: Preserve skin pores, fine lines, and texture around and underneath the jewelry
-10. PHOTO-QUALITY: The result must be indistinguishable from a professional photograph taken with the jewelry actually worn
+ABSOLUTE REALISM REQUIREMENTS - Apply ALL of these:
+
+1. SHADOWS ARE CRITICAL FOR REALISM:
+   - Jewelry MUST cast accurate, soft-edged shadows onto the skin (direction matches light source)
+   - Shadow intensity decreases with distance from contact point
+   - Add ambient occlusion in tight spaces (under ring band, between links)
+   - Include subtle self-shadowing on the jewelry itself
+   - No harsh or artificial shadow edges
+
+2. LIGHTING & REFLECTIONS:
+   - Match exact lighting direction, intensity, and color temperature from the original photo
+   - Metal surfaces must show realistic environment reflections (subtle skin tones, ambient light)
+   - Gemstones should show light refraction and internal sparkle
+   - Add subtle specular highlights where light hits metal edges
+   - Ensure jewelry brightness matches the scene's exposure
+
+3. PHYSICAL CONTACT & DEFORMATION:
+   - Show realistic skin compression where jewelry touches (especially visible on rings)
+   - Slight skin color change at pressure points (slight redness or whitening)
+   - Natural wrinkles and skin folds around the jewelry
+   - Jewelry should follow the exact 3D curvature of the body part
+   - No floating or hovering - jewelry must appear to have weight and contact
+
+4. PERSPECTIVE & SCALE:
+   - Apply correct perspective distortion based on camera angle
+   - Jewelry size must be anatomically proportional
+   - Maintain consistent depth of field with the original photo
+   - Foreground/background blur should match if present
+
+5. EDGE BLENDING & INTEGRATION:
+   - Seamless transitions between jewelry and skin - zero visible boundaries
+   - Preserve skin texture continuity (pores, hair, wrinkles must flow naturally around jewelry)
+   - Use micro-level anti-aliasing for perfect edge smoothness
+   - Slight color bleeding from jewelry onto nearby skin (subtle reflection)
+
+6. MATERIAL AUTHENTICITY:
+   - Metal: Brushed/polished finish visible, micro-scratches if present, appropriate reflectivity
+   - Gemstones: Facet reflections, depth, transparency variations, realistic brilliance
+   - Surface imperfections make it real (tiny wear marks, fingerprints, dust)
+
+7. COLOR & TONE MATCHING:
+   - Perfectly match white balance between jewelry and photo
+   - Jewelry colors adjusted to scene lighting conditions
+   - No saturation mismatch - jewelry shouldn't look pasted or oversaturated
+   - Subtle color cast from ambient light on jewelry
+
+8. ATMOSPHERIC CONSISTENCY:
+   - If photo has grain/noise, add matching grain to jewelry
+   - Match sharpness levels (don't make jewelry sharper than the rest)
+   - Compression artifacts should be consistent
+   - Overall photo "feel" must be unified
+
+9. ANATOMICAL ACCURACY:
+   - Jewelry placement follows natural wearing position
+   - Skin deforms realistically around tight jewelry
+   - Natural gaps where jewelry is loose
+   - Gravity affects draping/hanging correctly
+
+10. PHOTOGRAPHIC IMPERFECTIONS (Makes it believable):
+    - Slight motion blur if hand/body shows movement
+    - Natural focus falloff if applicable
+    - Realistic lighting inconsistencies (not overly perfect)
+    - Subtle lens distortion matching the original photo
 `;
 
     // Add specific instructions based on accessory type
     let specificInstructions = '';
     
     if (accessoryType === 'RING' && details.finger) {
-      specificInstructions = `\nRing-Specific Requirements:
-- Position: Natural ring location on the ${details.finger.toLowerCase()} finger (between first and second knuckle)
-- Proportions: Ring size must look anatomically correct${details.ringSize ? ` (approximate size: ${details.ringSize})` : ''}
-- Curvature: Follow the natural cylindrical curve of the finger - the ring should wrap around completely
-- Depth: Show the ring's thickness and how it sits slightly above the skin surface
-- Shadows: Cast ring shadow onto finger, show shadowing inside the band
-- Interaction: Slight skin pressure marks where band contacts finger, natural skin gathering if ring is snug`;
+      specificInstructions = `\n━━━ RING-SPECIFIC CRITICAL DETAILS ━━━
+📍 PLACEMENT: Position on ${details.finger.toLowerCase()} finger at the base (between first and second knuckle for most rings)
+📏 SIZE: Ring must look anatomically correct - not too loose or impossibly tight${details.ringSize ? ` (approx. size ${details.ringSize})` : ''}
+🔄 CURVATURE: Ring MUST wrap completely around the finger's cylindrical shape - show the band curving around sides and back
+📐 DEPTH & 3D: Ring sits 2-3mm above skin surface - show this elevation clearly
+🌑 SHADOWS: Dark shadow directly under the band, softer shadow extending outward on finger
+💪 SKIN INTERACTION: 
+   - Slight bulging of skin above/below ring if snug
+   - Subtle skin compression marks at contact points
+   - Finger skin texture continues under transparent stones
+   - Natural skin discoloration at pressure point
+🔆 METAL BEHAVIOR: Inside band is slightly darker, outside catches more light
+✨ STONE RENDERING: If present, gemstones refract light realistically, show finger skin through transparent stones`;
     } else if (accessoryType === 'WATCH') {
-      specificInstructions = `\nWatch-Specific Requirements:
-- Position: Natural placement on wrist, slightly above the wrist bone
-- Orientation: Watch face properly aligned and clearly visible
-- Band Integration: Band must curve and wrap realistically around the entire wrist circumference
-- Depth & Shadows: Watch case casts shadow on wrist, band creates subtle shadow trail
-- Skin Contact: Show how the band sits on wrist - slight skin compression, realistic strap tension
-- Reflections: Watch crystal/glass reflects ambient light naturally`;
+      specificInstructions = `\n━━━ WATCH-SPECIFIC CRITICAL DETAILS ━━━
+📍 PLACEMENT: Natural position on wrist, case sits 2-3cm above wrist bone on top of forearm
+🔄 BAND WRAPPING: Band must follow complete wrist circumference - show sides curving around
+📐 DEPTH: Watch case is 8-12mm thick - this elevation must be visible
+🌑 SHADOWS: 
+   - Primary shadow under watch case onto wrist
+   - Secondary shadows from band segments
+   - Shadow trail following the band's path
+💪 SKIN INTERACTION:
+   - Band creates slight skin indentation/compression line
+   - Wrist hair (if present) slightly pressed down under band
+   - Skin may show slight redness where band is snug
+🔆 WATCH FACE: Glass/crystal shows subtle reflections of environment, slight anti-glare coating
+✨ METAL LINKS: Each link casts tiny shadow on the next, creating depth
+📱 ORIENTATION: Watch face readable and properly aligned (12 o'clock points toward hand)`;
     } else if (accessoryType === 'BRACELET') {
-      specificInstructions = `\nBracelet-Specific Requirements:
-- Position: Natural placement on wrist with realistic draping based on bracelet weight and style
-- Curvature: Follow the wrist's natural cylindrical contour completely
-- Movement: If the bracelet is loose, show natural gaps between bracelet and skin
-- Depth: Show bracelet thickness and how it sits in relation to the skin surface
-- Shadows: Cast shadows on wrist, show internal shadowing in links or gaps
-- Physics: Respect gravity and natural hang of the bracelet material`;
+      specificInstructions = `\n━━━ BRACELET-SPECIFIC CRITICAL DETAILS ━━━
+📍 PLACEMENT: Natural position on wrist with realistic draping based on weight and flexibility
+🔄 CURVATURE: Follow wrist's oval/cylindrical contour completely
+📐 MOVEMENT: Show natural gaps between bracelet and skin if loose-fitting
+🌑 SHADOWS:
+   - Cast shadow on wrist surface
+   - Internal shadows between links/beads
+   - Shadow depth varies with bracelet thickness
+💪 SKIN INTERACTION:
+   - If snug: slight compression marks, skin gathering
+   - If loose: visible gaps, bracelet may hang lower on gravity side
+   - Wrist bones may create contact points
+🔆 PHYSICS: Heavier bracelets hang lower, lighter ones sit higher
+✨ MATERIAL DRAPING: Chain bracelets drape differently than solid bangles - show this behavior
+🔗 LINK/BEAD DETAILS: Each component interacts with light individually, creating complex shadows`;
     }
 
-    return basePrompt + specificInstructions + `\n\nIMPORTANT: The final result must look like a single photograph taken with a real camera where the person is actually wearing the jewelry. NO flat overlay effects, NO digital sticker appearance. Every detail must contribute to photorealistic authenticity.\n\nReturn ONLY the final photorealistic composite image.`;
+    return basePrompt + specificInstructions + `\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎯 FINAL CRITICAL INSTRUCTION:
+This must look EXACTLY like a professional photograph taken with a real camera of someone ACTUALLY wearing the jewelry.
+❌ FORBIDDEN: Flat overlay, digital sticker look, CGI appearance, perfect/artificial lighting, missing shadows, floating jewelry
+✅ REQUIRED: Imperfect but believable, natural lighting imperfections, realistic material behavior, proper depth and shadows
+
+Return ONLY the final photorealistic composite image - no explanations, no other content.`;
   }
 
   /**
@@ -270,7 +350,7 @@ Respond in JSON format:
 
       const response = await this.callWithRetry(() =>
         ai.models.generateContent({
-          model: 'gemini-3-pro-image-preview',
+          model: 'gemini-1.5-flash',
           contents: {
             parts: [
               { inlineData: { mimeType: optimized.mimeType, data: optimized.base64 } },
