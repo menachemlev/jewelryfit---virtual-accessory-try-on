@@ -2,6 +2,8 @@ import sharp from 'sharp';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import fs from 'fs';
+import { createCanvas, loadImage } from '@napi-rs/canvas';
+import { FilesetResolver, HandLandmarker } from '@mediapipe/tasks-vision';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -11,6 +13,58 @@ const __dirname = dirname(__filename);
  * Handles high-performance image preprocessing using Sharp
  */
 class ImageProcessingService {
+  constructor() {
+    this.handLandmarker = null;
+    this.handLandmarkerInitPromise = null;
+  }
+
+  toBuffer(input) {
+    if (typeof input === 'string') {
+      const base64Data = input.includes(',') ? input.split(',')[1] : input;
+      return Buffer.from(base64Data, 'base64');
+    }
+    return input;
+  }
+
+  async getHandLandmarker() {
+    if (this.handLandmarker) {
+      return this.handLandmarker;
+    }
+
+    if (this.handLandmarkerInitPromise) {
+      return this.handLandmarkerInitPromise;
+    }
+
+    this.handLandmarkerInitPromise = (async () => {
+      const vision = await FilesetResolver.forVisionTasks(
+        join(process.cwd(), 'node_modules', '@mediapipe', 'tasks-vision', 'wasm')
+      );
+
+      this.handLandmarker = await HandLandmarker.createFromOptions(vision, {
+        baseOptions: {
+          modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task'
+        },
+        numHands: 1,
+        runningMode: 'IMAGE'
+      });
+
+      return this.handLandmarker;
+    })();
+
+    return this.handLandmarkerInitPromise;
+  }
+
+  getFingerIndices(finger) {
+    const mapping = {
+      THUMB: [1, 2, 3, 4],
+      INDEX: [5, 6, 7, 8],
+      MIDDLE: [9, 10, 11, 12],
+      RING: [13, 14, 15, 16],
+      PINKY: [17, 18, 19, 20]
+    };
+
+    return mapping[finger] || mapping.RING;
+  }
   
   /**
    * Optimize image for AI processing
@@ -68,6 +122,189 @@ class ImageProcessingService {
       console.error('Error optimizing image:', error);
       throw new Error(`Image optimization failed: ${error.message}`);
     }
+  }
+
+  async detectFingerRegion(input, finger = 'RING') {
+    const buffer = this.toBuffer(input);
+    const image = await loadImage(buffer);
+    const canvas = createCanvas(image.width, image.height);
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(image, 0, 0, image.width, image.height);
+
+    const handLandmarker = await this.getHandLandmarker();
+    const result = handLandmarker.detect(canvas);
+
+    const landmarks = result?.landmarks?.[0];
+    if (!landmarks || landmarks.length < 21) {
+      return null;
+    }
+
+    const fingerIndices = this.getFingerIndices(finger);
+    const fingerPoints = fingerIndices.map((idx) => ({
+      x: landmarks[idx].x * image.width,
+      y: landmarks[idx].y * image.height
+    }));
+
+    const mcpPoint = fingerPoints[0];
+    const pipPoint = fingerPoints[1] || fingerPoints[0];
+    const tipPoint = fingerPoints[fingerPoints.length - 1];
+
+    const fingerLength = Math.max(
+      40,
+      Math.hypot(tipPoint.x - mcpPoint.x, tipPoint.y - mcpPoint.y)
+    );
+
+    const xs = fingerPoints.map((p) => p.x);
+    const ys = fingerPoints.map((p) => p.y);
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    const minY = Math.min(...ys);
+    const maxY = Math.max(...ys);
+
+    const paddingX = Math.max(50, Math.round(fingerLength * 0.9));
+    const paddingY = Math.max(60, Math.round(fingerLength * 0.95));
+
+    const left = Math.max(0, Math.floor(minX - paddingX));
+    const top = Math.max(0, Math.floor(minY - paddingY));
+    const right = Math.min(image.width, Math.ceil(maxX + paddingX));
+    const bottom = Math.min(image.height, Math.ceil(maxY + paddingY));
+
+    const width = Math.max(200, right - left);
+    const height = Math.max(200, bottom - top);
+
+    const ringAnchor = {
+      x: mcpPoint.x + (pipPoint.x - mcpPoint.x) * 0.35,
+      y: mcpPoint.y + (pipPoint.y - mcpPoint.y) * 0.35
+    };
+
+    const fingerAngleDegrees = Math.atan2(pipPoint.y - mcpPoint.y, pipPoint.x - mcpPoint.x) * (180 / Math.PI);
+    const estimatedBandWidth = Math.max(34, Math.round(fingerLength * 0.55));
+
+    return {
+      imageSize: { width: image.width, height: image.height },
+      crop: {
+        left,
+        top,
+        width: Math.min(width, image.width - left),
+        height: Math.min(height, image.height - top)
+      },
+      ringAnchor,
+      ringAngleDegrees: fingerAngleDegrees + 90,
+      estimatedBandWidth
+    };
+  }
+
+  async removeNearWhiteBackground(input) {
+    const buffer = this.toBuffer(input);
+    const { data, info } = await sharp(buffer)
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+
+      const max = Math.max(r, g, b);
+      const min = Math.min(r, g, b);
+      const saturation = max === 0 ? 0 : (max - min) / max;
+      const brightness = (r + g + b) / 3;
+
+      if (brightness > 245 && saturation < 0.08) {
+        data[i + 3] = 0;
+      } else if (brightness > 228 && saturation < 0.13) {
+        data[i + 3] = Math.min(data[i + 3], 35);
+      } else if (brightness > 210 && saturation < 0.18) {
+        data[i + 3] = Math.min(data[i + 3], 95);
+      }
+    }
+
+    return sharp(data, {
+      raw: {
+        width: info.width,
+        height: info.height,
+        channels: 4
+      }
+    })
+      .trim()
+      .png()
+      .toBuffer();
+  }
+
+  async buildGuidedRingComposite(baseImage, accessoryImage, finger = 'RING') {
+    const baseBuffer = this.toBuffer(baseImage);
+    const region = await this.detectFingerRegion(baseBuffer, finger);
+
+    if (!region) {
+      return null;
+    }
+
+    const cropBuffer = await sharp(baseBuffer)
+      .extract(region.crop)
+      .png()
+      .toBuffer();
+
+    const ringNoBg = await this.removeNearWhiteBackground(accessoryImage);
+
+    const ringOverlay = await sharp(ringNoBg)
+      .resize({
+        width: region.estimatedBandWidth,
+        fit: 'inside',
+        withoutEnlargement: false
+      })
+      .rotate(region.ringAngleDegrees, { background: { r: 0, g: 0, b: 0, alpha: 0 } })
+      .png()
+      .toBuffer();
+
+    const ringMeta = await sharp(ringOverlay).metadata();
+    const overlayLeft = Math.max(0, Math.round(region.ringAnchor.x - region.crop.left - (ringMeta.width || 0) / 2));
+    const overlayTop = Math.max(0, Math.round(region.ringAnchor.y - region.crop.top - (ringMeta.height || 0) / 2));
+
+    const guidedCropBuffer = await sharp(cropBuffer)
+      .composite([
+        {
+          input: ringOverlay,
+          left: overlayLeft,
+          top: overlayTop,
+          blend: 'over'
+        }
+      ])
+      .png()
+      .toBuffer();
+
+    return {
+      cropRect: region.crop,
+      cropBuffer,
+      guidedCropBuffer,
+      accessoryNoBgBuffer: ringNoBg,
+      mimeType: 'image/png'
+    };
+  }
+
+  async reattachEditedCrop(fullImage, editedCrop, cropRect) {
+    const fullBuffer = this.toBuffer(fullImage);
+    const editedBuffer = this.toBuffer(editedCrop);
+    const resizedEditedCrop = await sharp(editedBuffer)
+      .resize({
+        width: cropRect.width,
+        height: cropRect.height,
+        fit: 'fill'
+      })
+      .png()
+      .toBuffer();
+
+    return sharp(fullBuffer)
+      .composite([
+        {
+          input: resizedEditedCrop,
+          left: cropRect.left,
+          top: cropRect.top,
+          blend: 'over'
+        }
+      ])
+      .jpeg({ quality: 95 })
+      .toBuffer();
   }
 
   /**

@@ -401,6 +401,54 @@ app.post('/api/generate-try-on-image', authenticateToken, async (req, res) => {
 
     const commonInstruction = "Strictly maintain the original camera angle, perspective, focal length, and composition of the Base image. Do not crop, zoom, or alter the background. The output must look exactly like the original photo but with the accessory added.";
 
+    const normalizedFinger = normalizeRingFinger(finger);
+
+    if (type === 'RING') {
+      const guidedContext = await imageProcessingService.buildGuidedRingComposite(
+        baseImage,
+        accessoryImage,
+        normalizedFinger
+      );
+
+      if (guidedContext) {
+        const fingerName = getFingerDisplayName(normalizedFinger);
+        const guidedCropBase64 = guidedContext.guidedCropBuffer.toString('base64');
+        const accessoryNoBgBase64 = guidedContext.accessoryNoBgBuffer.toString('base64');
+
+        const cropPrompt = `You are editing only a cropped hand region from a larger photo.
+The ring position guide is already visible in this crop.
+Task: create a photorealistic result with the ring worn only on the ${fingerName} finger.
+Keep the crop dimensions and framing unchanged.
+Do not change skin pose, finger identity, camera angle, or background content.
+Blend shadows, reflections, and skin contact naturally.
+Remove any pasted/graphic look from the guide and return a realistic photographic crop only.`;
+
+        const cropResponse = await callWithRetry(() => ai.models.generateContent({
+          model: 'gemini-3-pro-image-preview',
+          contents: {
+            parts: [
+              { text: cropPrompt },
+              { inlineData: { mimeType: 'image/png', data: guidedCropBase64 } },
+              { inlineData: { mimeType: 'image/png', data: accessoryNoBgBase64 } }
+            ]
+          }
+        }));
+
+        const editedCropBase64 = extractGeneratedImageBase64(cropResponse);
+        if (editedCropBase64) {
+          const fullComposite = await imageProcessingService.reattachEditedCrop(
+            baseImage,
+            Buffer.from(editedCropBase64, 'base64'),
+            guidedContext.cropRect
+          );
+
+          return res.json({
+            image: `data:image/jpeg;base64,${fullComposite.toString('base64')}`
+          });
+        }
+      }
+    }
+
     let prompt = "";
     if (type === 'WATCH') {
       prompt = `A hyper-realistic photo editing task. The user has provided two images: 1) A photo of a person's wrist/arm (Base). 2) A photo of a watch face/strap (Accessory). 
@@ -414,7 +462,6 @@ app.post('/api/generate-try-on-image', authenticateToken, async (req, res) => {
       It should look natural, following the curvature of the wrist in the current perspective. Add realistic contact shadows. Adjust lighting to match the skin tone and environment.`;
     } else {
       // Ring Logic with Fingers
-      const normalizedFinger = normalizeRingFinger(finger);
       const fingerName = getFingerDisplayName(normalizedFinger);
       prompt = `A hyper-realistic photo editing task. The user has provided two images: 1) A photo of a person's hand (Base). 2) A photo of a ring (Accessory). 
       Task: Place the ring on the ${fingerName} finger of the hand in the Base image. 
@@ -425,8 +472,6 @@ app.post('/api/generate-try-on-image', authenticateToken, async (req, res) => {
     }
     
     const modelName = 'gemini-3-pro-image-preview';
-
-    const normalizedFinger = normalizeRingFinger(finger);
     const maxAttempts = type === 'RING' ? 2 : 1;
     let finalImageBase64 = null;
     let observedFinger = 'NONE';
