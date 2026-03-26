@@ -116,6 +116,74 @@ const callWithRetry = async (fn, retries = 3, delay = 1000) => {
   }
 };
 
+const VALID_RING_FINGERS = ['THUMB', 'INDEX', 'MIDDLE', 'RING', 'PINKY'];
+
+const normalizeRingFinger = (finger) => {
+  const normalized = String(finger || 'RING').toUpperCase();
+  return VALID_RING_FINGERS.includes(normalized) ? normalized : 'RING';
+};
+
+const getFingerDisplayName = (finger) => {
+  const names = {
+    THUMB: 'thumb',
+    INDEX: 'index (pointer)',
+    MIDDLE: 'middle',
+    RING: 'ring',
+    PINKY: 'pinky (little)'
+  };
+  return names[finger] || 'ring';
+};
+
+const extractGeneratedImageBase64 = (response) => {
+  for (const part of response.candidates?.[0]?.content?.parts || []) {
+    if (part.inlineData && part.inlineData.data) {
+      return part.inlineData.data;
+    }
+  }
+  return null;
+};
+
+const verifyRingFingerPlacement = async (ai, imageBase64, targetFinger) => {
+  try {
+    const validationResponse = await callWithRetry(() => ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: {
+        parts: [
+          { inlineData: { mimeType: 'image/png', data: imageBase64 } },
+          {
+            text: `Analyze this image and check where the ring is worn.
+Target finger: ${targetFinger}.
+Return JSON only in this exact format:
+{ "correct": boolean, "observedFinger": "THUMB|INDEX|MIDDLE|RING|PINKY|NONE" }
+Set correct=true only if the ring is clearly on the target finger.`
+          }
+        ]
+      },
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            correct: { type: Type.BOOLEAN },
+            observedFinger: { type: Type.STRING }
+          },
+          required: ['correct', 'observedFinger']
+        }
+      }
+    }));
+
+    const parsed = JSON.parse(validationResponse.text || '{}');
+    return {
+      correct: Boolean(parsed.correct),
+      observedFinger: String(parsed.observedFinger || 'NONE').toUpperCase()
+    };
+  } catch (error) {
+    console.warn('Ring finger placement validation skipped:', error.message);
+    // Fail open: do not block response if validation model fails.
+    return { correct: true, observedFinger: 'NONE' };
+  }
+};
+
 // ============ ENDPOINTS ============
 
 /**
@@ -346,43 +414,65 @@ app.post('/api/generate-try-on-image', authenticateToken, async (req, res) => {
       It should look natural, following the curvature of the wrist in the current perspective. Add realistic contact shadows. Adjust lighting to match the skin tone and environment.`;
     } else {
       // Ring Logic with Fingers
-      const fingerName = finger.toLowerCase();
+      const normalizedFinger = normalizeRingFinger(finger);
+      const fingerName = getFingerDisplayName(normalizedFinger);
       prompt = `A hyper-realistic photo editing task. The user has provided two images: 1) A photo of a person's hand (Base). 2) A photo of a ring (Accessory). 
       Task: Place the ring on the ${fingerName} finger of the hand in the Base image. 
       ${commonInstruction}
-      Position it at the base of the ${fingerName} finger where a ring naturally sits. Scale it to fit the finger width perfectly. Rotate it to align with the finger's direction in the current perspective. Add realistic shadows and reflections. Ensure the ring looks like it is encircling the finger.`;
+      CRITICAL TARGET: The ring MUST be on ${normalizedFinger} only. Do NOT place it on any other finger.
+      Position it at the base of the ${fingerName} finger where a ring naturally sits. Scale it to fit the finger width perfectly. Rotate it to align with the finger's direction in the current perspective. Add realistic shadows and reflections. Ensure the ring looks like it is encircling the finger.
+      If the ${fingerName} finger is partially occluded, still keep placement on that same finger using visible landmarks and never switch to a different finger.`;
     }
-
-    // Select model based on complexity
-    // Use pro model for difficult fingers (THUMB, PINKY, MIDDLE) on rings
-    const useProModel = type === 'RING' && (finger !== 'RING');
-    //const modelName = useProModel ? 'gemini-3-pro-image-preview' : 'gemini-2.5-flash-image';
     
     const modelName = 'gemini-3-pro-image-preview';
 
-    const response = await callWithRetry(() => ai.models.generateContent({
-      model: modelName,
-      contents: {
-        parts: [
-          { text: prompt },
-          { inlineData: { mimeType: 'image/jpeg', data: baseData } },
-          { inlineData: { mimeType: 'image/jpeg', data: accData } }
-        ]
-      },
-      config: {
-        imageConfig: {
-          aspectRatio: "1:1",
-        }
-      }
-    }));
+    const normalizedFinger = normalizeRingFinger(finger);
+    const maxAttempts = type === 'RING' ? 2 : 1;
+    let finalImageBase64 = null;
+    let observedFinger = 'NONE';
 
-    // Find the image in the response
-    for (const part of response.candidates?.[0]?.content?.parts || []) {
-      if (part.inlineData && part.inlineData.data) {
-        return res.json({ 
-          image: `data:image/png;base64,${part.inlineData.data}` 
-        });
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const retryInstruction = type === 'RING' && attempt > 1
+        ? `\nRETRY FIX: Previous output placed the ring on ${observedFinger}. This is incorrect. Regenerate and place the ring ONLY on ${normalizedFinger}.`
+        : '';
+
+      const response = await callWithRetry(() => ai.models.generateContent({
+        model: modelName,
+        contents: {
+          parts: [
+            { text: `${prompt}${retryInstruction}` },
+            { inlineData: { mimeType: 'image/jpeg', data: baseData } },
+            { inlineData: { mimeType: 'image/jpeg', data: accData } }
+          ]
+        },
+        config: {
+          imageConfig: {
+            aspectRatio: "1:1",
+          }
+        }
+      }));
+
+      finalImageBase64 = extractGeneratedImageBase64(response);
+      if (!finalImageBase64) {
+        continue;
       }
+
+      if (type !== 'RING') {
+        break;
+      }
+
+      const placementCheck = await verifyRingFingerPlacement(ai, finalImageBase64, normalizedFinger);
+      if (placementCheck.correct) {
+        break;
+      }
+
+      observedFinger = placementCheck.observedFinger;
+    }
+
+    if (finalImageBase64) {
+      return res.json({
+        image: `data:image/png;base64,${finalImageBase64}`
+      });
     }
 
     throw new Error('No image generated by AI');
