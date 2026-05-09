@@ -1,5 +1,5 @@
 import { GoogleGenAI } from '@google/genai';
-import {serverlessDbService} from './serverless-db.js';
+import { serverlessDbService } from './serverless-db.js';
 import { authenticateToken } from '../api/users/_middleware.js';
 
 const getGeminiClient = () => {
@@ -70,31 +70,45 @@ export default async function handler(req, res) {
     const baseData = baseImage.split(',')[1] || baseImage;
     const accData = accessoryImage.split(',')[1] || accessoryImage;
 
-    const commonInstruction = "Strictly maintain the original camera angle, perspective, focal length, and composition of the Base image. Do not crop, zoom, or alter the background. The output must look exactly like the original photo but with the accessory added.";
+    const commonInstruction = "CRITICAL INSTRUCTIONS: This is a photorealistic image editing task. You must strictly maintain the original camera angle, perspective, focal length, background, and skin tone of the Base image. Do not crop or zoom. Seamlessly blend the accessory into the image using advanced image editing techniques: match the environmental lighting, apply correct ambient occlusion, and generate realistic contact shadows cast by the accessory onto the skin to completely avoid a flat, 'pasted-on' sticker look.";
 
     let prompt = "";
     if (type === 'WATCH') {
-      prompt = `A hyper-realistic photo editing task. The user has provided two images: 1) A photo of a person's wrist/arm (Base). 2) A photo of a watch face/strap (Accessory). 
+      prompt = `A hyper-realistic photo editing task. Inputs: 1) A photo of a person's wrist/arm (Base). 2) A photo of a watch (Accessory). 
       Task: Wear the watch on the wrist in the Base image. 
       ${commonInstruction}
-      Scale the watch perfectly to fit the wrist size in the current perspective. Rotate it to match the arm's angle. Add realistic shadows cast by the watch onto the skin. Adjust the watch's lighting to match the scene. Maintain high resolution and skin texture.`;
+      Scale the watch perfectly to fit the wrist size in the current perspective. Rotate it to match the arm's angle. Add realistic contact shadows cast by the watch face and strap onto the skin. Adjust the watch's metallic and glass reflections to match the ambient room lighting. Maintain high resolution and natural skin texture around the watch.`;
     } else if (type === 'BRACELET') {
-      prompt = `A hyper-realistic photo editing task. The user has provided two images: 1) A photo of a person's wrist/arm (Base). 2) A photo of a bracelet (Accessory). 
+      prompt = `A hyper-realistic photo editing task. Inputs: 1) A photo of a person's wrist/arm (Base). 2) A photo of a bracelet (Accessory). 
       Task: Place the bracelet around the wrist in the Base image. 
       ${commonInstruction}
-      It should look natural, following the curvature of the wrist in the current perspective. Add realistic contact shadows. Adjust lighting to match the skin tone and environment.`;
+      It must look completely natural, following the physical curvature of the wrist. The back half of the bracelet must be hidden behind the wrist to simulate 3D volume. Add realistic drop shadows and adjust lighting to match the skin tone and environment perfectly.`;
     } else {
       const fingerName = finger.toLowerCase();
-      const ringCircumference = ringSize; // EU size = circumference in mm
-      prompt = `A hyper-realistic photo editing task. The user has provided two images: 1) A photo of a person's hand (Base). 2) A photo of a ring (Accessory). 
-      Task: Place the ring on the ${fingerName} finger of the hand in the Base image. 
+      
+      // Mapping for precise anatomical placement
+      const fingerDescriptions = {
+        'thumb': 'thumb (the thickest, outermost digit)',
+        'index': 'index finger (the pointer finger, located right next to the thumb)',
+        'middle': 'middle finger (the longest, central digit)',
+        'ring': 'ring finger (the fourth digit, located between the middle and pinky fingers)',
+        'pinky': 'pinky finger (the smallest, outermost digit on the far edge of the hand)'
+      };
+      const explicitFingerDescription = fingerDescriptions[fingerName] || fingerName;
+      const ringCircumference = ringSize; 
+
+      prompt = `A hyper-realistic photo composition task. 
+      Inputs: 1) Base image of a hand. 2) Accessory image of a ring.
+      Task: Place the ring SPECIFICALLY AND ONLY on the ${explicitFingerDescription}. 
       ${commonInstruction}
-      Position it at the base of the ${fingerName} finger where a ring naturally sits. The ring size is EU ${ringCircumference} (${ringCircumference}mm circumference) - scale the ring to match this specific finger circumference perfectly. Rotate it to align with the finger's direction in the current perspective. Add realistic shadows and reflections. Ensure the ring looks like it is encircling the finger snugly.`;
+      Specific details for realism:
+      1. Location: MUST be strictly on the ${explicitFingerDescription}. Position it at the natural base of this specific finger.
+      2. 3D Volume: The ring size is EU ${ringCircumference} (${ringCircumference}mm). Scale it precisely. The ring must wrap physically around the cylindrical shape of the finger. The back portion of the ring MUST be hidden behind the finger.
+      3. Integration: Add soft, realistic drop shadows directly beneath the ring where it touches the skin. Add specular highlights and reflections on the ring's material that match the light source of the base photo. Soften the outer edges of the ring very slightly to blend naturally with the skin pixels.`;
     }
     
-    // Use pro model for difficult fingers
+    // Model selection
     const useProModel = type === 'RING' && (finger !== 'RING');
-    //const modelName = useProModel ? 'gemini-3-pro-image-preview' : 'gemini-2.5-flash-image';
     const modelName = 'gemini-3-pro-image-preview';
 
     const response = await callWithRetry(() => ai.models.generateContent({
@@ -140,7 +154,6 @@ export default async function handler(req, res) {
     try {
       return res.status(500).json({ error: errorMessage });
     } catch (jsonError) {
-      // Fallback if JSON stringification fails
       res.setHeader('Content-Type', 'application/json');
       return res.status(500).send(JSON.stringify({ error: 'Internal server error' }));
     }
