@@ -20,35 +20,78 @@ const LIMITS = {
 };
 
 // Helper to compress image
-const compressImage = (base64: string, maxWidth = 1920, maxHeight = 1080, quality = 0.85): Promise<string> => {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.src = base64;
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      let w = img.width;
-      let h = img.height;
-      
-      // Scale to Full HD (1920x1080) keeping aspect ratio
-      const widthRatio = maxWidth / w;
-      const heightRatio = maxHeight / h;
-      const ratio = Math.min(widthRatio, heightRatio, 1); // Don't upscale
-      
-      w = Math.round(w * ratio);
-      h = Math.round(h * ratio);
+const getBase64Size = (base64: string): number => {
+  const base64Data = base64.split(',')[1] || '';
+  return Math.ceil((base64Data.length * 3) / 4);
+};
 
+const loadImageFromDataUrl = (dataUrl: string): Promise<HTMLImageElement> => {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.src = dataUrl;
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+  });
+};
+
+export const compressImage = async (
+  base64: string,
+  maxWidth = 1920,
+  maxHeight = 1080,
+  maxBytes = 250 * 1024
+): Promise<string> => {
+  try {
+    const image = await loadImageFromDataUrl(base64);
+    let width = image.width;
+    let height = image.height;
+
+    const ratio = Math.min(maxWidth / width, maxHeight / height, 1);
+    width = Math.round(width * ratio);
+    height = Math.round(height * ratio);
+
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      return base64;
+    }
+
+    const drawToCanvas = (w: number, h: number) => {
       canvas.width = w;
       canvas.height = h;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-          ctx.drawImage(img, 0, 0, w, h);
-          resolve(canvas.toDataURL('image/jpeg', quality));
-      } else {
-          resolve(base64); // Fallback
-      }
+      ctx.clearRect(0, 0, w, h);
+      ctx.drawImage(image, 0, 0, w, h);
     };
-    img.onerror = () => resolve(base64); // Fallback
-  });
+
+    drawToCanvas(width, height);
+    let quality = 0.92;
+    let output = canvas.toDataURL('image/jpeg', quality);
+    let size = getBase64Size(output);
+
+    while (size > maxBytes && quality >= 0.35) {
+      quality -= 0.08;
+      output = canvas.toDataURL('image/jpeg', Math.max(0.35, quality));
+      size = getBase64Size(output);
+    }
+
+    while (size > maxBytes && width > 320 && height > 320) {
+      width = Math.max(320, Math.round(width * 0.9));
+      height = Math.max(320, Math.round(height * 0.9));
+      drawToCanvas(width, height);
+      quality = 0.92;
+      output = canvas.toDataURL('image/jpeg', quality);
+      size = getBase64Size(output);
+      while (size > maxBytes && quality >= 0.35) {
+        quality -= 0.08;
+        output = canvas.toDataURL('image/jpeg', Math.max(0.35, quality));
+        size = getBase64Size(output);
+      }
+    }
+
+    return output;
+  } catch (error) {
+    console.warn('Image compression failed, returning original data URL.', error);
+    return base64;
+  }
 };
 
 export const storageService = {

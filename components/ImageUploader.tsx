@@ -1,6 +1,7 @@
 import React, { useCallback } from 'react';
 import { ImageState, Language } from '../types';
 import { translations } from '../constants/translations';
+import { compressImage } from '../services/storageService';
 
 export interface ValidationState {
   status: 'idle' | 'analyzing' | 'valid' | 'invalid';
@@ -20,15 +21,23 @@ interface ImageUploaderProps {
 export const ImageUploader: React.FC<ImageUploaderProps> = ({ label, imageState, onImageChange, onEdit, id, lang, validation }) => {
   const t = translations[lang];
   
-  const handleFileChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onloadend = () => {
+      reader.onloadend = async () => {
+        const rawBase64 = reader.result as string;
+        let compressedBase64 = rawBase64;
+        try {
+          compressedBase64 = await compressImage(rawBase64);
+        } catch (e) {
+          console.warn('Failed to compress uploaded image, using original.', e);
+        }
+
         onImageChange({
-          file: file,
+          file,
           previewUrl: URL.createObjectURL(file),
-          base64: reader.result as string
+          base64: compressedBase64
         });
       };
       reader.readAsDataURL(file);

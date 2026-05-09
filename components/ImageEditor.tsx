@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { Language } from '../types';
 import { translations } from '../constants/translations';
+import { compressImage } from '../services/storageService';
 
 interface ImageEditorProps {
   imageSrc: string;
@@ -96,10 +97,11 @@ export const ImageEditor: React.FC<ImageEditorProps> = ({ imageSrc, onSave, onCa
     setIsDragging(false);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (canvasRef.current) {
       const dataUrl = canvasRef.current.toDataURL('image/jpeg', 0.9);
-      onSave(dataUrl);
+      const compressedBase64 = await compressImage(dataUrl);
+      onSave(compressedBase64);
     }
   };
 
